@@ -39,7 +39,7 @@ class WebInterface:
         self.discord_auth = DiscordAuth(
             client_id=config.get('discord_client_id'),
             client_secret=config.get('discord_client_secret'),
-            redirect_uri=f"{config.get('domain', 'http://localhost')}:{config.get('port', 8888)}/auth/callback"
+            redirect_uri=f"{config.get('domain', 'http://localhost')}/auth/callback"
         )
         
         # Initialize server permissions
