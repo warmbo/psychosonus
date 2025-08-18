@@ -61,8 +61,8 @@ class MusicBot(commands.Bot):
                 
                 self.current_channel = ctx.channel
                 self.current_guild_id = ctx.guild.id
-                web_port = self.config.get('web_port', 8888)
-                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: http://{domain}:{port}")
+                port = self.config.get('port', 8888)
+                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: https://{domain}:{port}")
                 
                 if not self.is_playing:
                     await self.play_next()
@@ -109,7 +109,7 @@ class MusicBot(commands.Bot):
             )
             embed.add_field(
                 name="Dashboard Access", 
-                value=f"After inviting, authorize at: http://{domain}:{self.config.get('web_port', 8888)}/auth",
+                value=f"After inviting, authorize at: http://{domain}:{self.config.get('port', 8888)}/auth",
                 inline=False
             )
             await ctx.send(embed=embed)
@@ -117,7 +117,7 @@ class MusicBot(commands.Bot):
         @self.command(name='github', aliases=['gh', 'source', 'code'])
         async def show_github(ctx):
             """Show GitHub repository link"""
-            github_url = self.config.get('github_repo', 'https://github.com/yourusername/psychosonus')
+            github_url = self.config.get('github_repo', 'https://github.com/warmbo/psychosonus')
             
             embed = discord.Embed(
                 title="📁 Psychosonus Source Code",
@@ -139,7 +139,7 @@ class MusicBot(commands.Bot):
         @self.command(name='dashboard', aliases=['web', 'ui'])
         async def dashboard_info(ctx):
             """Show dashboard information"""
-            web_port = self.config.get('web_port', 8888)
+            port = self.config.get('port', 8888)
             
             embed = discord.Embed(
                 title="🌐 Web Dashboard",
@@ -283,7 +283,7 @@ class MusicBot(commands.Bot):
     async def on_ready(self):
         """Bot ready event"""
         logger.info(f'🎵 {self.user} is online!')
-        web_port = self.config.get('web_port', 8888)
+        port = self.config.get('port', 8888)
         logger.info(f'🌐 Web dashboard: http://{domain}:{port}')
         logger.info(f'🔐 Auth endpoint: http://{domain}:{port}/auth')
     
