@@ -7,43 +7,80 @@ Handles music search and metadata extraction
 import logging
 import requests
 import base64
+import time
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+import yt_dlp # Import yt-dlp here
+
+from common import Song # Import Song from common.py
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class Song:
-    """Song data structure"""
-    id: str
-    title: str
-    artist: str
-    duration: str
-    url: str
-    preview_url: Optional[str] = None
+class YouTubeManager:
+    """YouTube search and audio extraction"""
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
-        return {
-            'id': self.id,
-            'title': self.title,
-            'artist': self.artist,
-            'duration': self.duration,
-            'url': self.url,
-            'preview_url': self.preview_url
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Song':
-        """Create Song from dictionary"""
-        return cls(
-            id=data['id'],
-            title=data['title'],
-            artist=data['artist'],
-            duration=data['duration'],
-            url=data['url'],
-            preview_url=data.get('preview_url')
-        )
+    @staticmethod
+    def search_tracks(query: str, limit: int = 5) -> List[Song]:
+        """Search for tracks on YouTube"""
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'default_search': f'ytsearch{limit}:',
+                'ignoreerrors': True,
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                search_results = ydl.extract_info(query, download=False)
+                
+                tracks = []
+                if 'entries' in search_results:
+                    for entry in search_results['entries']:
+                        if entry and 'id' in entry:
+                            duration = entry.get('duration', 0)
+                            if duration:
+                                minutes = duration // 60
+                                seconds = duration % 60
+                                duration_str = f"{minutes:02d}:{seconds:02d}"
+                            else:
+                                duration_str = "Unknown"
+                            
+                            song = Song(
+                                id=entry['id'],
+                                title=entry.get('title', 'Unknown Title')[:100],
+                                artist=entry.get('uploader', 'Unknown Artist')[:50],
+                                duration=duration_str,
+                                url=f"https://www.youtube.com/watch?v={entry['id']}"
+                            )
+                            tracks.append(song)
+                
+                return tracks
+                
+        except Exception as e:
+            logger.error(f"YouTube search error: {e}")
+            return []
+            
+    @staticmethod
+    def get_audio_url(youtube_url: str) -> Optional[str]:
+        """Extract audio URL from YouTube video"""
+        try:
+            ydl_opts = {
+                'format': 'bestaudio[ext=webm]/bestaudio/best',
+                'quiet': True,
+                'no_warnings': True,
+                'ignoreerrors': True,
+                'extractaudio': True,
+                'audioformat': 'webm',
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(youtube_url, download=False)
+                return info.get('url')
+                
+        except Exception as e:
+            logger.error(f"Error getting audio URL for {youtube_url}: {e}")
+            return None
+
 
 class SpotifyManager:
     """Spotify API integration for music search"""
@@ -57,11 +94,9 @@ class SpotifyManager:
     def _get_access_token(self) -> bool:
         """Get Spotify access token using client credentials flow"""
         try:
-            # Encode credentials
             credentials = f"{self.client_id}:{self.client_secret}"
             encoded_credentials = base64.b64encode(credentials.encode()).decode()
             
-            # Request token
             headers = {
                 'Authorization': f'Basic {encoded_credentials}',
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -79,8 +114,6 @@ class SpotifyManager:
             if response.status_code == 200:
                 token_data = response.json()
                 self.access_token = token_data['access_token']
-                # Set expiration time (subtract 60 seconds for safety)
-                import time
                 self.token_expires_at = time.time() + token_data['expires_in'] - 60
                 logger.info("Successfully obtained Spotify access token")
                 return True
@@ -94,7 +127,6 @@ class SpotifyManager:
     
     def _ensure_valid_token(self) -> bool:
         """Ensure we have a valid access token"""
-        import time
         if not self.access_token or time.time() >= self.token_expires_at:
             return self._get_access_token()
         return True
@@ -115,7 +147,7 @@ class SpotifyManager:
                 'q': query,
                 'type': 'track',
                 'limit': limit,
-                'market': 'US'  # You can make this configurable
+                'market': 'US'
             }
             
             response = requests.get(
@@ -130,13 +162,11 @@ class SpotifyManager:
                 tracks = []
                 
                 for track in data.get('tracks', {}).get('items', []):
-                    # Format duration
                     duration_ms = track.get('duration_ms', 0)
                     minutes = duration_ms // 60000
                     seconds = (duration_ms % 60000) // 1000
                     duration_str = f"{minutes:02d}:{seconds:02d}"
                     
-                    # Get artist names
                     artists = [artist['name'] for artist in track.get('artists', [])]
                     artist_str = ', '.join(artists) if artists else 'Unknown Artist'
                     
@@ -154,10 +184,9 @@ class SpotifyManager:
                 return tracks
             
             elif response.status_code == 401:
-                # Token expired, try to refresh
                 logger.warning("Spotify token expired, refreshing...")
                 if self._get_access_token():
-                    return self.search_tracks(query, limit)  # Retry once
+                    return self.search_tracks(query, limit)
                 else:
                     logger.error("Failed to refresh Spotify token")
                     return []
@@ -189,13 +218,11 @@ class SpotifyManager:
             if response.status_code == 200:
                 track = response.json()
                 
-                # Format duration
                 duration_ms = track.get('duration_ms', 0)
                 minutes = duration_ms // 60000
                 seconds = (duration_ms % 60000) // 1000
                 duration_str = f"{minutes:02d}:{seconds:02d}"
                 
-                # Get artist names
                 artists = [artist['name'] for artist in track.get('artists', [])]
                 artist_str = ', '.join(artists) if artists else 'Unknown Artist'
                 
@@ -221,8 +248,8 @@ class SearchManager:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.spotify = None
+        self.youtube = YouTubeManager()
         
-        # Initialize Spotify if credentials are provided
         spotify_client_id = config.get('spotify_client_id')
         spotify_client_secret = config.get('spotify_client_secret')
         
@@ -237,23 +264,31 @@ class SearchManager:
             logger.warning("Spotify credentials missing from config")
     
     def search_tracks(self, query: str, limit: int = 5) -> List[Song]:
-        """Search for tracks using available services"""
+        """Search for tracks using available services (prioritize Spotify)"""
         if self.spotify:
             return self.spotify.search_tracks(query, limit)
+        elif self.youtube:
+            return self.youtube.search_tracks(query, limit)
         else:
             logger.error("No search services available")
             return []
     
-    def get_track_info(self, track_id: str, service: str = 'spotify') -> Optional[Song]:
-        """Get track information from specific service"""
-        if service == 'spotify' and self.spotify:
-            return self.spotify.get_track_info(track_id)
+    def get_audio_url(self, song: Song) -> Optional[str]:
+        """Get the audio URL for a song, searching YouTube if needed"""
+        if 'youtube' in song.url:
+            return self.youtube.get_audio_url(song.url)
         else:
-            logger.error(f"Service '{service}' not available")
+            # Fallback to YouTube search for songs from other services (e.g., Spotify)
+            search_query = f"{song.title} {song.artist}"
+            tracks = self.youtube.search_tracks(search_query, limit=1)
+            if tracks:
+                return self.youtube.get_audio_url(tracks[0].url)
             return None
     
-    def is_service_available(self, service: str = 'spotify') -> bool:
+    def is_service_available(self, service: str) -> bool:
         """Check if a service is available"""
         if service == 'spotify':
             return self.spotify is not None
+        elif service == 'youtube':
+            return self.youtube is not None
         return False

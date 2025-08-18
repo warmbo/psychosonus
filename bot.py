@@ -16,8 +16,9 @@ from typing import Dict, List, Optional, Any
 import discord
 from discord.ext import commands
 from flask import Flask, jsonify, request, send_from_directory
-import yt_dlp
-import requests
+
+from common import Song # Import Song from common.py
+from search import SearchManager # Import SearchManager from search.py
 
 # Configure logging
 logging.basicConfig(
@@ -57,37 +58,6 @@ class Config:
     def get(self, key: str, default=None):
         """Get configuration value"""
         return self.data.get(key, default)
-
-class Song:
-    """Song data structure"""
-    
-    def __init__(self, id: str, title: str, artist: str, duration: str, url: str):
-        self.id = id
-        self.title = title
-        self.artist = artist
-        self.duration = duration
-        self.url = url
-    
-    def to_dict(self) -> Dict[str, str]:
-        """Convert to dictionary for JSON serialization"""
-        return {
-            'id': self.id,
-            'title': self.title,
-            'artist': self.artist,
-            'duration': self.duration,
-            'url': self.url
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, str]) -> 'Song':
-        """Create Song from dictionary"""
-        return cls(
-            id=data['id'],
-            title=data['title'],
-            artist=data['artist'],
-            duration=data['duration'],
-            url=data['url']
-        )
 
 class MusicQueue:
     """Thread-safe music queue manager"""
@@ -152,76 +122,10 @@ class MusicQueue:
         with self._lock:
             return len(self.queue)
 
-class YouTubeManager:
-    """YouTube search and audio extraction"""
-    
-    @staticmethod
-    def search_tracks(query: str, limit: int = 5) -> List[Song]:
-        """Search for tracks on YouTube"""
-        try:
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': True,
-                'default_search': f'ytsearch{limit}:',
-                'ignoreerrors': True,
-            }
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                search_results = ydl.extract_info(query, download=False)
-                
-                tracks = []
-                if 'entries' in search_results:
-                    for entry in search_results['entries']:
-                        if entry and 'id' in entry:
-                            duration = entry.get('duration', 0)
-                            if duration:
-                                minutes = duration // 60
-                                seconds = duration % 60
-                                duration_str = f"{minutes:02d}:{seconds:02d}"
-                            else:
-                                duration_str = "Unknown"
-                            
-                            song = Song(
-                                id=entry['id'],
-                                title=entry.get('title', 'Unknown Title')[:100],  # Limit title length
-                                artist=entry.get('uploader', 'Unknown Artist')[:50],  # Limit artist length
-                                duration=duration_str,
-                                url=f"https://www.youtube.com/watch?v={entry['id']}"
-                            )
-                            tracks.append(song)
-                
-                return tracks
-                
-        except Exception as e:
-            logger.error(f"YouTube search error: {e}")
-            return []
-    
-    @staticmethod
-    def get_audio_url(youtube_url: str) -> Optional[str]:
-        """Extract audio URL from YouTube video"""
-        try:
-            ydl_opts = {
-                'format': 'bestaudio[ext=webm]/bestaudio/best',
-                'quiet': True,
-                'no_warnings': True,
-                'ignoreerrors': True,
-                'extractaudio': True,
-                'audioformat': 'webm',
-            }
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(youtube_url, download=False)
-                return info.get('url')
-                
-        except Exception as e:
-            logger.error(f"Error getting audio URL for {youtube_url}: {e}")
-            return None
-
 class MusicBot(commands.Bot):
     """Main Discord bot class"""
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, search_manager: SearchManager):
         intents = discord.Intents.default()
         intents.message_content = True
         
@@ -232,6 +136,7 @@ class MusicBot(commands.Bot):
         )
         
         self.config = config
+        self.search_manager = search_manager
         self.music_queue = MusicQueue(config.get('max_queue_size', 100))
         self.voice_client: Optional[discord.VoiceClient] = None
         self.is_playing = False
@@ -290,7 +195,7 @@ class MusicBot(commands.Bot):
                 return
             
             queue_text = []
-            for i, item in enumerate(queue_list[:10]):  # Show first 10
+            for i, item in enumerate(queue_list[:10]):
                 song = item['song']
                 if item['current']:
                     prefix = "▶️ "
@@ -332,13 +237,11 @@ class MusicBot(commands.Bot):
                 await ctx.send("❌ You need to be in a voice channel!")
                 return
             
-            # Join voice channel if not already connected
             if not self.voice_client:
                 await join_voice(ctx)
             
-            # Search for the song
             await ctx.send(f"🔍 Searching for: **{query}**")
-            tracks = YouTubeManager.search_tracks(query, limit=1)
+            tracks = self.search_manager.search_tracks(query, limit=1)
             
             if not tracks:
                 await ctx.send("❌ No results found")
@@ -383,7 +286,7 @@ class MusicBot(commands.Bot):
         self.is_playing = True
         
         try:
-            audio_url = YouTubeManager.get_audio_url(next_song.url)
+            audio_url = self.search_manager.get_audio_url(next_song)
             if not audio_url:
                 logger.error(f"Failed to get audio URL for: {next_song.title}")
                 if self.current_channel:
@@ -393,7 +296,7 @@ class MusicBot(commands.Bot):
             
             FFMPEG_OPTIONS = {
                 'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-                'options': '-vn -filter:a "volume=0.5"'
+                'options': f'-vn -filter:a "volume={self.config.get("default_volume", 0.5)}"'
             }
             
             source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
@@ -402,7 +305,6 @@ class MusicBot(commands.Bot):
                 if error:
                     logger.error(f'Player error: {error}')
                 
-                # Schedule next track
                 future = asyncio.run_coroutine_threadsafe(self.play_next(), self.loop)
                 try:
                     future.result(timeout=5)
@@ -458,7 +360,7 @@ class WebInterface:
                 if not query:
                     return jsonify({'success': False, 'error': 'No query provided'})
                 
-                tracks = YouTubeManager.search_tracks(query, limit=8)
+                tracks = self.bot.search_manager.search_tracks(query, limit=8)
                 return jsonify({
                     'success': True,
                     'results': [track.to_dict() for track in tracks]
@@ -485,16 +387,16 @@ class WebInterface:
             """Add song to queue"""
             try:
                 data = request.json
-                song_data = data.get('song')
+                if not data or 'song' not in data:
+                    return jsonify({'success': False, 'error': 'Invalid request: "song" key is missing'})
                 
-                if not song_data:
-                    return jsonify({'success': False, 'error': 'No song data'})
+                song_data = data['song']
                 
                 song = Song.from_dict(song_data)
                 
                 if self.bot.music_queue.add_song(song):
-                    # Start playing if not already playing
                     if self.bot.voice_client and not self.bot.is_playing:
+                        # Note: Using asyncio.run_coroutine_threadsafe to safely schedule async task
                         future = asyncio.run_coroutine_threadsafe(self.bot.play_next(), self.bot.loop)
                         future.result(timeout=5)
                     
@@ -502,6 +404,8 @@ class WebInterface:
                 else:
                     return jsonify({'success': False, 'error': 'Queue is full'})
                 
+            except KeyError as e:
+                return jsonify({'success': False, 'error': f'Missing song data field: {e}'})
             except Exception as e:
                 logger.error(f"Add to queue error: {e}")
                 return jsonify({'success': False, 'error': str(e)})
@@ -571,20 +475,14 @@ class WebInterface:
 def main():
     """Main function"""
     try:
-        # Load configuration
         config = Config()
-        
-        # Create bot instance
-        bot = MusicBot(config)
-        
-        # Create web interface
+        search_manager = SearchManager(config.data)
+        bot = MusicBot(config, search_manager)
         web_interface = WebInterface(bot, config)
         
-        # Start Flask in separate thread
         flask_thread = threading.Thread(target=web_interface.run, daemon=True)
         flask_thread.start()
         
-        # Start Discord bot
         bot.run(config.get('discord_token'))
         
     except KeyboardInterrupt:
