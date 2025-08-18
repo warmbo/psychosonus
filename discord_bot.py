@@ -135,7 +135,7 @@ class MusicBot(commands.Bot):
             if not self.voice_client:
                 await join_voice(ctx)
             
-            # Search for the song
+            # Search for the song on YouTube only (avoid Spotify DRM issues)
             await ctx.send(f"🔍 Searching for: **{query}**")
             tracks = YouTubeManager.search_tracks(query, limit=1)
             
@@ -182,25 +182,43 @@ class MusicBot(commands.Bot):
         self.is_playing = True
         
         try:
-            # Determine which URL to use for audio extraction
-            playback_url = next_song.get_playback_url()
-            
-            # If it's a Spotify track without YouTube URL, search for it
-            if next_song.source == 'spotify' and not next_song.youtube_url:
+            # Handle Spotify tracks by searching YouTube
+            if next_song.source == 'spotify':
                 if self.current_channel:
-                    await self.current_channel.send(f"🔍 Finding YouTube source for: **{next_song.title}**")
+                    await self.current_channel.send(f"🔍 Finding YouTube source for: **{next_song.title}** by {next_song.artist}")
                 
-                youtube_url = YouTubeManager.search_youtube_for_spotify_track(next_song)
-                if youtube_url:
-                    next_song.youtube_url = youtube_url
-                    playback_url = youtube_url
-                    logger.info(f"Found YouTube URL for Spotify track: {next_song.title}")
-                else:
-                    logger.error(f"Could not find YouTube equivalent for: {next_song.title}")
+                # Try multiple search variations
+                search_queries = [
+                    f"{next_song.artist} {next_song.title}",
+                    f"{next_song.title} {next_song.artist}",
+                    f"{next_song.title}",
+                    f"{next_song.artist} - {next_song.title}"
+                ]
+                
+                youtube_tracks = []
+                for query in search_queries:
+                    logger.info(f"Trying YouTube search: {query}")
+                    youtube_tracks = YouTubeManager.search_tracks(query, limit=3)
+                    if youtube_tracks:
+                        logger.info(f"Found {len(youtube_tracks)} results for: {query}")
+                        break
+                
+                if not youtube_tracks:
+                    logger.error(f"Could not find YouTube equivalent for: {next_song.title} by {next_song.artist}")
                     if self.current_channel:
                         await self.current_channel.send(f"❌ Could not find playable source for: **{next_song.title}**")
                     await self.play_next()
                     return
+                
+                # Use the YouTube version
+                youtube_song = youtube_tracks[0]
+                playback_url = youtube_song.url
+                # Update the song object for display
+                next_song.youtube_url = playback_url
+                logger.info(f"Found YouTube equivalent: {youtube_song.title} - {youtube_song.url}")
+            else:
+                # Direct YouTube URL
+                playback_url = next_song.url
             
             # Extract audio URL
             audio_url = YouTubeManager.get_audio_url(playback_url)
@@ -240,6 +258,8 @@ class MusicBot(commands.Bot):
                 )
                 if next_song.source == 'spotify':
                     embed.add_field(name="Source", value="🎵 Spotify → YouTube", inline=True)
+                else:
+                    embed.add_field(name="Source", value="🎥 YouTube", inline=True)
                 await self.current_channel.send(embed=embed)
             
         except Exception as e:

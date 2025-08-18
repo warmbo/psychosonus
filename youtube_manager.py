@@ -18,66 +18,136 @@ class YouTubeManager:
     def search_tracks(query: str, limit: int = 5) -> List[Song]:
         """Search for tracks on YouTube"""
         try:
+            logger.info(f"Searching YouTube for: '{query}' (limit: {limit})")
+            
+            # More permissive yt-dlp options
             ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
+                'quiet': False,  # Enable output for debugging
+                'no_warnings': False,
                 'extract_flat': True,
                 'default_search': f'ytsearch{limit}:',
                 'ignoreerrors': True,
-                'source_address': '0.0.0.0',  # Bind to IPv4
+                'source_address': '0.0.0.0',
+                'socket_timeout': 60,
+                'retries': 5,
+                'fragment_retries': 5,
+                'http_chunk_size': 10485760,
+                'geo_bypass': True,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             }
             
+            tracks = []
+            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                search_results = ydl.extract_info(query, download=False)
-                
-                tracks = []
-                if 'entries' in search_results:
-                    for entry in search_results['entries']:
-                        if entry and 'id' in entry:
-                            duration = entry.get('duration', 0)
-                            if duration:
+                try:
+                    logger.info(f"Extracting info for search: {query}")
+                    search_results = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+                    
+                    logger.info(f"Raw search results type: {type(search_results)}")
+                    if search_results:
+                        logger.info(f"Search results keys: {list(search_results.keys()) if isinstance(search_results, dict) else 'Not a dict'}")
+                    
+                    if not search_results:
+                        logger.warning(f"yt-dlp returned None for query: {query}")
+                        return []
+                    
+                    if 'entries' not in search_results:
+                        logger.warning(f"No 'entries' key in search results for: {query}")
+                        logger.debug(f"Available keys: {list(search_results.keys()) if isinstance(search_results, dict) else 'Not a dict'}")
+                        return []
+                    
+                    entries = search_results['entries']
+                    logger.info(f"Found {len(entries)} raw entries")
+                    
+                    for i, entry in enumerate(entries):
+                        logger.debug(f"Processing entry {i+1}: {type(entry)}")
+                        
+                        if not entry:
+                            logger.debug(f"Entry {i+1} is None, skipping")
+                            continue
+                            
+                        if 'id' not in entry:
+                            logger.debug(f"Entry {i+1} has no 'id', skipping")
+                            continue
+                        
+                        # Extract information
+                        video_id = entry['id']
+                        title = entry.get('title', 'Unknown Title')
+                        uploader = entry.get('uploader', 'Unknown Artist')
+                        duration = entry.get('duration', 0)
+                        
+                        logger.debug(f"Entry {i+1}: id={video_id}, title={title}, uploader={uploader}, duration={duration} (type: {type(duration)})")
+                        
+                        # Format duration - FIXED: Handle float durations
+                        if duration and duration > 0:
+                            try:
+                                # Convert to int in case it's a float
+                                duration = int(float(duration))
                                 minutes = duration // 60
                                 seconds = duration % 60
                                 duration_str = f"{minutes:02d}:{seconds:02d}"
-                            else:
+                            except (ValueError, TypeError):
                                 duration_str = "Unknown"
-                            
-                            song = Song(
-                                id=entry['id'],
-                                title=entry.get('title', 'Unknown Title')[:100],
-                                artist=entry.get('uploader', 'Unknown Artist')[:50],
-                                duration=duration_str,
-                                url=f"https://www.youtube.com/watch?v={entry['id']}",
-                                source='youtube'
-                            )
-                            tracks.append(song)
-                
-                return tracks
+                        else:
+                            duration_str = "Unknown"
+                        
+                        # Try to extract artist from title if it contains " - "
+                        if ' - ' in title and uploader in ['Various Artists', 'Unknown Artist', title]:
+                            parts = title.split(' - ', 1)
+                            if len(parts) == 2:
+                                uploader = parts[0].strip()
+                                title = parts[1].strip()
+                        
+                        song = Song(
+                            id=video_id,
+                            title=title[:100],
+                            artist=uploader[:50],
+                            duration=duration_str,
+                            url=f"https://www.youtube.com/watch?v={video_id}",
+                            source='youtube'
+                        )
+                        tracks.append(song)
+                        logger.info(f"Added track: {song.title} by {song.artist} ({song.url})")
+                    
+                    logger.info(f"Successfully processed {len(tracks)} tracks for query: {query}")
+                    return tracks
+                    
+                except Exception as extract_error:
+                    logger.error(f"Error during yt-dlp extraction for '{query}': {extract_error}")
+                    logger.error(f"Error type: {type(extract_error)}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    return []
                 
         except Exception as e:
-            logger.error(f"YouTube search error: {e}")
+            logger.error(f"YouTube search error for '{query}': {e}")
+            logger.error(f"Error type: {type(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
     @staticmethod
     def get_audio_url(youtube_url: str) -> Optional[str]:
         """Extract audio URL from YouTube video"""
+        logger.info(f"Extracting audio URL from: {youtube_url}")
+        
         try:
             ydl_opts = {
                 'format': 'bestaudio/best',
-                'quiet': True,
-                'no_warnings': True,
+                'quiet': False,  # Enable output for debugging
+                'no_warnings': False,
                 'ignoreerrors': True,
                 'extractaudio': True,
                 'audioformat': 'mp3',
-                'source_address': '0.0.0.0',  # Bind to IPv4
-                'cookiefile': None,  # Don't use cookies
+                'source_address': '0.0.0.0',
+                'cookiefile': None,
                 'age_limit': None,
                 'geo_bypass': True,
                 'extract_flat': False,
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'referer': 'https://www.youtube.com/',
-                'socket_timeout': 30,
-                'retries': 3,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'socket_timeout': 60,
+                'retries': 5,
+                'fragment_retries': 5,
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -87,10 +157,13 @@ class YouTubeManager:
                         logger.info(f"Successfully extracted audio URL for: {info.get('title', 'Unknown')}")
                         return info['url']
                     else:
-                        # Try alternative format selection
-                        logger.warning(f"No direct URL found, trying alternative formats for: {youtube_url}")
+                        logger.warning(f"No direct URL in info for: {youtube_url}")
+                        if info:
+                            logger.debug(f"Available info keys: {list(info.keys())}")
                         
-                        # Fallback format options
+                        # Try alternative format selection
+                        logger.warning(f"Trying alternative formats for: {youtube_url}")
+                        
                         fallback_formats = [
                             'bestaudio[ext=m4a]',
                             'bestaudio[ext=webm]', 
@@ -100,6 +173,7 @@ class YouTubeManager:
                         
                         for fmt in fallback_formats:
                             try:
+                                logger.debug(f"Trying format: {fmt}")
                                 ydl_opts['format'] = fmt
                                 with yt_dlp.YoutubeDL(ydl_opts) as ydl_fallback:
                                     info = ydl_fallback.extract_info(youtube_url, download=False)
