@@ -11,8 +11,10 @@ import time
 from typing import Dict, List, Optional, Any
 
 from models import Song
+from youtube_manager import YouTubeManager
 
 logger = logging.getLogger(__name__)
+
 
 class SpotifyManager:
     """Spotify API integration for music search"""
@@ -129,6 +131,51 @@ class SpotifyManager:
         except Exception as e:
             logger.error(f"Spotify search error: {e}")
             return []
+    
+    def get_track_info(self, track_id: str) -> Optional[Song]:
+        """Get detailed track information"""
+        if not self._ensure_valid_token():
+            return None
+        
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.get(
+                f'https://api.spotify.com/v1/tracks/{track_id}',
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                track = response.json()
+                
+                duration_ms = track.get('duration_ms', 0)
+                minutes = duration_ms // 60000
+                seconds = (duration_ms % 60000) // 1000
+                duration_str = f"{minutes:02d}:{seconds:02d}"
+                
+                artists = [artist['name'] for artist in track.get('artists', [])]
+                artist_str = ', '.join(artists) if artists else 'Unknown Artist'
+                
+                return Song(
+                    id=track['id'],
+                    title=track.get('name', 'Unknown Title'),
+                    artist=artist_str,
+                    duration=duration_str,
+                    url=track.get('external_urls', {}).get('spotify', ''),
+                    source='spotify'
+                )
+            else:
+                logger.error(f"Failed to get track info: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting track info: {e}")
+            return None
+
 
 class SearchManager:
     """Main search manager that handles different music services"""
@@ -136,6 +183,7 @@ class SearchManager:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.spotify = None
+        self.youtube = YouTubeManager()
         
         spotify_client_id = config.get('spotify_client_id')
         spotify_client_secret = config.get('spotify_client_secret')
@@ -151,15 +199,31 @@ class SearchManager:
             logger.warning("Spotify credentials missing from config")
     
     def search_tracks(self, query: str, limit: int = 5) -> List[Song]:
-        """Search for tracks using Spotify"""
+        """Search for tracks using available services (prioritize Spotify)"""
         if self.spotify:
             return self.spotify.search_tracks(query, limit)
+        elif self.youtube:
+            return self.youtube.search_tracks(query, limit)
         else:
-            logger.error("Spotify not available")
+            logger.error("No search services available")
             return []
+    
+    def get_audio_url(self, song: Song) -> Optional[str]:
+        """Get the audio URL for a song, searching YouTube if needed"""
+        if 'youtube' in song.url:
+            return self.youtube.get_audio_url(song.url)
+        else:
+            # Fallback to YouTube search for songs from other services (e.g., Spotify)
+            search_query = f"{song.title} {song.artist}"
+            tracks = self.youtube.search_tracks(search_query, limit=1)
+            if tracks:
+                return self.youtube.get_audio_url(tracks[0].url)
+            return None
     
     def is_service_available(self, service: str) -> bool:
         """Check if a service is available"""
         if service == 'spotify':
             return self.spotify is not None
+        elif service == 'youtube':
+            return self.youtube is not None
         return False
