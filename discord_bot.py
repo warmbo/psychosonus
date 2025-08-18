@@ -62,7 +62,7 @@ class MusicBot(commands.Bot):
                 self.current_channel = ctx.channel
                 self.current_guild_id = ctx.guild.id
                 web_port = self.config.get('web_port', 8888)
-                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: http://localhost:{web_port}")
+                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: http://{domain}:{port}")
                 
                 if not self.is_playing:
                     await self.play_next()
@@ -109,7 +109,7 @@ class MusicBot(commands.Bot):
             )
             embed.add_field(
                 name="Dashboard Access", 
-                value=f"After inviting, authorize at: http://localhost:{self.config.get('web_port', 8888)}/auth",
+                value=f"After inviting, authorize at: http://{domain}:{self.config.get('web_port', 8888)}/auth",
                 inline=False
             )
             await ctx.send(embed=embed)
@@ -143,12 +143,12 @@ class MusicBot(commands.Bot):
             
             embed = discord.Embed(
                 title="🌐 Web Dashboard",
-                description=f"Access the web interface at: http://localhost:{web_port}",
+                description=f"Access the web interface at: http://{domain}:{port}",
                 color=0x00ff88
             )
             embed.add_field(
                 name="Authentication Required",
-                value=f"Sign in with Discord at: http://localhost:{web_port}/auth",
+                value=f"Sign in with Discord at: http://{domain}:{port}/auth",
                 inline=False
             )
             embed.add_field(
@@ -284,8 +284,8 @@ class MusicBot(commands.Bot):
         """Bot ready event"""
         logger.info(f'🎵 {self.user} is online!')
         web_port = self.config.get('web_port', 8888)
-        logger.info(f'🌐 Web dashboard: http://localhost:{web_port}')
-        logger.info(f'🔐 Auth endpoint: http://localhost:{web_port}/auth')
+        logger.info(f'🌐 Web dashboard: http://{domain}:{port}')
+        logger.info(f'🔐 Auth endpoint: http://{domain}:{port}/auth')
     
     async def on_command_error(self, ctx, error):
         """Handle command errors"""

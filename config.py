@@ -65,8 +65,8 @@ class Config:
         return domain
     
     def get_port(self) -> int:
-        """Get the web port"""
-        return self.get('port', 8888)
+        """Get the web port (support both 'port' and 'web_port' for compatibility)"""
+        return self.get('port', self.get('web_port', 8888))
     
     def is_localhost(self) -> bool:
         """Check if running on localhost"""
