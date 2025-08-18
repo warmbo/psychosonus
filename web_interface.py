@@ -563,7 +563,8 @@ class WebInterface:
     
     def run(self):
         """Run Flask app"""
-        port = self.config.get('web_port', 8888)
+        port = self.config.get('port', 8888)
+        domain = self.config.get('domain', 'localhost')
         logger.info(f"Starting web interface on port {port}")
-        logger.info(f"Discord OAuth2 redirect URI: http://localhost:{port}/auth/callback")
+        logger.info(f"Discord OAuth2 redirect URI: http://{domain}:{port}/auth/callback")
         self.app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
