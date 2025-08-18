@@ -15,3 +15,6 @@ spotipy>=2.22.1
 
 # YouTube Integration - REQUIRED for audio streaming
 yt-dlp>=2023.7.6
+
+# Authentication & Security
+PyJWT>=2.8.0

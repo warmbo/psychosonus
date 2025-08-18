@@ -1,12 +1,4 @@
-.pause-btn {
-    background-color: #ffaa00;
-    color: #ffffff;
-}
-
-.pause-btn:hover {
-    background-color: #ffbb22;
-    transform: translateY(-1px);
-}/* Custom Font */
+/* Custom Font */
 @font-face {
     font-family: 'UrbanChristmas';
     src: url('/static/urban_christmas.otf') format('opentype');
@@ -59,6 +51,43 @@ body {
     background: linear-gradient(135deg, #111111 0%, #222222 100%);
 }
 
+/* User Section */
+.user-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #111111;
+    border: 1px solid #333;
+    border-radius: 6px;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
+}
+
+.user-profile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.username {
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.logout-btn {
+    background-color: #cc3333;
+    color: #ffffff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.logout-btn:hover {
+    background-color: #dd4444;
+}
+
 /* Bot Logo Section */
 .bot-logo {
     text-align: center;
@@ -79,7 +108,6 @@ body {
     height: auto;
     transition: all 0.3s ease-in;
     border: 0;
-
 }
 
 .bot-logo-image:hover {
@@ -96,6 +124,11 @@ body {
     font-weight: normal;
     margin-bottom: 10px;
     color: #ffffff;
+    text-shadow: 
+        0 0 10px rgba(255, 0, 0, 0.8),
+        0 0 20px rgba(255, 0, 0, 0.5),
+        0 0 30px rgba(255, 0, 0, 0.3),
+        2px 2px 4px rgba(0, 0, 0, 0.8);
     letter-spacing: 2px;
 }
 
@@ -191,6 +224,10 @@ h3 {
     color: #888888;
     font-size: 0.75rem;
     margin-top: 2px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Current Track */
@@ -348,6 +385,12 @@ h3 {
     color: #666666;
 }
 
+.search-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #0a0a0a;
+}
+
 .search-btn {
     padding: 12px 20px;
     background-color: #1a1a1a;
@@ -359,11 +402,18 @@ h3 {
     transition: all 0.3s ease;
 }
 
-.search-btn:hover {
+.search-btn:hover:not(:disabled) {
     background-color: #2a2a2a;
     border-color: #555555;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+}
+
+.search-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background-color: #0a0a0a;
+    border-color: #222222;
 }
 
 .search-btn i {
@@ -510,8 +560,14 @@ h3 {
     white-space: nowrap;
 }
 
-.add-btn:hover {
+.add-btn:hover:not(:disabled) {
     background-color: #0077dd;
+}
+
+.add-btn:disabled {
+    background-color: #333333;
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 /* Messages */
@@ -543,6 +599,17 @@ h3 {
     background-color: #1a1a3d;
     color: #8888ff;
     border: 1px solid #2d2d5a;
+}
+
+/* Access Denied Styling */
+.access-denied {
+    background-color: #3d1a1a;
+    color: #ff8888;
+    border: 2px solid #5a2d2d;
+    padding: 15px;
+    border-radius: 6px;
+    text-align: center;
+    margin: 20px 0;
 }
 
 /* Animations */
@@ -587,7 +654,7 @@ h3 {
     }
     
     .bot-name {
-        font-size: 3.5m;
+        font-size: 3.5rem;
     }
     
     .bot-logo-image {
@@ -597,5 +664,9 @@ h3 {
     
     body {
         overflow: auto;
+    }
+    
+    .status-detail {
+        max-width: 80px;
     }
 }

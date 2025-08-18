@@ -4,7 +4,7 @@
     "discord_token": "Get from https://discord.com/developers/applications - Create app > Bot > Copy Token",
     "spotify_setup": "Go to https://developer.spotify.com/dashboard - Create app > Settings > Copy Client ID & Secret",
     "spotify_redirect": "In Spotify app settings, add redirect URI: http://localhost:8888/callback/spotify",
-    "domain_setup": "Set your domain/subdomain (e.g., 'music.example.com' or 'localhost'). Used for web dashboard URLs and Spotify redirects."
+    "web_url": "Set this to your domain/subdomain where the bot is hosted (e.g., https://psychosonus.yourdomain.com)"
   },
   
   "discord_token": "DISCORD_BOT_TOKEN_GOES_HERE",
@@ -12,10 +12,9 @@
   "spotify_client_id": "SPOTIFY_CLIENT_ID_GOES_HERE",
   "spotify_client_secret": "SPOTIFY_CLIENT_SECRET_GOES_HERE",
   
-  "domain": "localhost",
-  "use_https": false,
   "web_port": 8888,
-  "command_prefix": "!",
+  "web_url": "http://localhost:8888",s
+  "command_prefix": "!p ",
   "max_queue_size": 100,
   "default_volume": 0.5
 }

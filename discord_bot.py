@@ -6,7 +6,6 @@ Discord bot functionality for Psychosonus
 import asyncio
 import logging
 from typing import Optional
-
 import discord
 from discord.ext import commands
 
@@ -23,6 +22,8 @@ class MusicBot(commands.Bot):
     def __init__(self, config: Config):
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.guilds = True
+        intents.guild_members = True
         
         super().__init__(
             command_prefix=config.get('command_prefix', '!'),
@@ -35,6 +36,7 @@ class MusicBot(commands.Bot):
         self.voice_client: Optional[discord.VoiceClient] = None
         self.is_playing = False
         self.current_channel = None
+        self.current_guild_id = None
         
         # Add commands
         self.add_commands()
@@ -58,8 +60,9 @@ class MusicBot(commands.Bot):
                     self.voice_client = await channel.connect()
                 
                 self.current_channel = ctx.channel
-                dashboard_url = self.config.get_base_url()
-                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: {dashboard_url}")
+                self.current_guild_id = ctx.guild.id
+                web_port = self.config.get('web_port', 8888)
+                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: http://localhost:{web_port}")
                 
                 if not self.is_playing:
                     await self.play_next()
@@ -76,20 +79,97 @@ class MusicBot(commands.Bot):
                 self.voice_client = None
                 self.is_playing = False
                 self.current_channel = None
+                self.current_guild_id = None
                 await ctx.send("👋 Left voice channel")
             else:
                 await ctx.send("❌ Not in a voice channel")
         
-        @self.command(name='dashboard', aliases=['web', 'url'])
-        async def show_dashboard(ctx):
-            """Show web dashboard URL"""
-            dashboard_url = self.config.get_base_url()
+        @self.command(name='invite')
+        async def create_invite(ctx):
+            """Create bot invite link"""
+            permissions = discord.Permissions()
+            permissions.connect = True
+            permissions.speak = True
+            permissions.use_voice_activation = True
+            permissions.read_messages = True
+            permissions.send_messages = True
+            permissions.embed_links = True
+            permissions.read_message_history = True
+            
+            invite_url = discord.utils.oauth_url(
+                self.user.id, 
+                permissions=permissions,
+                scopes=['bot', 'applications.commands']
+            )
+            
+            embed = discord.Embed(
+                title="🎵 Invite Psychosonus",
+                description=f"[Click here to add me to your server!]({invite_url})",
+                color=0x00ff88
+            )
+            embed.add_field(
+                name="Dashboard Access", 
+                value=f"After inviting, authorize at: http://localhost:{self.config.get('web_port', 8888)}/auth",
+                inline=False
+            )
+            await ctx.send(embed=embed)
+        
+        @self.command(name='github', aliases=['gh', 'source', 'code'])
+        async def show_github(ctx):
+            """Show GitHub repository link"""
+            github_url = self.config.get('github_repo', 'https://github.com/yourusername/psychosonus')
+            
+            embed = discord.Embed(
+                title="📁 Psychosonus Source Code",
+                description=f"[View on GitHub]({github_url})",
+                color=0x00ff88
+            )
+            embed.add_field(
+                name="Features",
+                value="• Discord Music Bot\n• Web Dashboard\n• Spotify + YouTube\n• Queue Management",
+                inline=True
+            )
+            embed.add_field(
+                name="Tech Stack", 
+                value="• Python + discord.py\n• Flask Web API\n• yt-dlp + spotipy\n• JWT Authentication",
+                inline=True
+            )
+            await ctx.send(embed=embed)
+        
+        @self.command(name='dashboard', aliases=['web', 'ui'])
+        async def dashboard_info(ctx):
+            """Show dashboard information"""
+            web_port = self.config.get('web_port', 8888)
+            
             embed = discord.Embed(
                 title="🌐 Web Dashboard",
-                description=f"Access the web interface at:\n**{dashboard_url}**",
-                color=0x00ff00
+                description=f"Access the web interface at: http://localhost:{web_port}",
+                color=0x00ff88
             )
-            embed.add_field(name="Features", value="• Remote control\n• Search & queue management\n• Real-time status", inline=False)
+            embed.add_field(
+                name="Authentication Required",
+                value=f"Sign in with Discord at: http://localhost:{web_port}/auth",
+                inline=False
+            )
+            embed.add_field(
+                name="Features",
+                value="• Search music\n• Manage queue\n• Control playback\n• Real-time status",
+                inline=True
+            )
+            
+            if self.current_guild_id == ctx.guild.id:
+                embed.add_field(
+                    name="Status",
+                    value="✅ Bot connected to this server",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="Status", 
+                    value="❌ Use `!join` to connect bot first",
+                    inline=True
+                )
+            
             await ctx.send(embed=embed)
         
         @self.command(name='queue', aliases=['q'])
@@ -163,12 +243,49 @@ class MusicBot(commands.Bot):
                     await self.play_next()
             else:
                 await ctx.send("❌ Queue is full")
+        
+        @self.command(name='help', aliases=['commands'])
+        async def show_help(ctx):
+            """Show bot commands"""
+            embed = discord.Embed(
+                title="🎵 Psychosonus Commands",
+                description="Discord Music Bot with Web Dashboard",
+                color=0x00ff88
+            )
+            
+            embed.add_field(
+                name="🎶 Music Commands",
+                value="`!join` - Join voice channel\n"
+                      "`!play <song>` - Search and play\n"
+                      "`!queue` - Show queue\n" 
+                      "`!skip` - Skip current song\n"
+                      "`!stop` - Stop and clear queue\n"
+                      "`!leave` - Leave voice channel",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🌐 Web Dashboard",
+                value="`!dashboard` - Dashboard info\n"
+                      "`!invite` - Get invite link",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="ℹ️ Info Commands", 
+                value="`!github` - View source code\n"
+                      "`!help` - Show this help",
+                inline=True
+            )
+            
+            await ctx.send(embed=embed)
     
     async def on_ready(self):
         """Bot ready event"""
         logger.info(f'🎵 {self.user} is online!')
-        dashboard_url = self.config.get_base_url()
-        logger.info(f'🌐 Web dashboard: {dashboard_url}')
+        web_port = self.config.get('web_port', 8888)
+        logger.info(f'🌐 Web dashboard: http://localhost:{web_port}')
+        logger.info(f'🔐 Auth endpoint: http://localhost:{web_port}/auth')
     
     async def on_command_error(self, ctx, error):
         """Handle command errors"""
@@ -177,6 +294,10 @@ class MusicBot(commands.Bot):
         
         logger.error(f"Command error: {error}")
         await ctx.send(f"❌ An error occurred: {str(error)}")
+    
+    def get_current_guild_id(self) -> Optional[int]:
+        """Get the current guild ID where bot is active"""
+        return self.current_guild_id
     
     async def play_next(self):
         """Play next song in queue"""

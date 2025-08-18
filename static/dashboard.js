@@ -1,4 +1,4 @@
-// Dashboard JavaScript for Psychosonus
+// Dashboard JavaScript for Psychosonus with Discord Auth
 const API_URL = '/api';
 
 // State management
@@ -10,7 +10,8 @@ let trackDuration = 0;
 let isPlaying = false;
 let isPaused = false;
 let isShuffleEnabled = false;
-let botConfig = {};
+let currentUser = null;
+let userHasAccess = false;
 
 // DOM Elements
 const elements = {
@@ -45,7 +46,11 @@ const elements = {
     // Progress elements
     currentTime: null,
     totalTime: null,
-    progressFill: null
+    progressFill: null,
+    
+    // Auth elements
+    userInfo: null,
+    logoutButton: null
 };
 
 // Initialize dashboard
@@ -53,10 +58,56 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeElements();
     setupEventListeners();
     setupLogoErrorHandling();
-    fetchConfig();
-    startPolling();
-    updateBotStatus('Connecting...', false);
+    checkAuthentication();
 });
+
+function checkAuthentication() {
+    fetch('/api/user')
+        .then(response => {
+            if (response.status === 401) {
+                // Not authenticated, redirect to auth
+                window.location.href = '/auth';
+                return;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.success) {
+                currentUser = data.user;
+                setupAuthenticatedInterface();
+                startPolling();
+                updateBotStatus('Connecting...', false);
+            } else {
+                window.location.href = '/auth';
+            }
+        })
+        .catch(error => {
+            console.error('Auth check failed:', error);
+            window.location.href = '/auth';
+        });
+}
+
+function setupAuthenticatedInterface() {
+    // Display user info
+    if (elements.userInfo) {
+        elements.userInfo.innerHTML = `
+            <div class="user-profile">
+                <span class="username">${escapeHtml(currentUser.username)}</span>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
+        `;
+        
+        // Setup logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to logout?')) {
+                    window.location.href = '/auth/logout';
+                }
+            });
+        }
+    }
+}
 
 function setupLogoErrorHandling() {
     const logoImg = document.getElementById('botLogo');
@@ -125,41 +176,6 @@ function setupEventListeners() {
     }
 }
 
-// Configuration Management
-async function fetchConfig() {
-    try {
-        const response = await fetch(`${API_URL}/config`);
-        const data = await response.json();
-        
-        if (data.success) {
-            botConfig = data;
-            console.log('Bot configuration loaded:', botConfig);
-            
-            // Update document title with domain if not localhost
-            if (botConfig.domain && botConfig.domain !== 'localhost') {
-                document.title = `Psychosonus Dashboard - ${botConfig.domain}`;
-            }
-            
-            // Log configuration info
-            console.log(`Dashboard URL: ${botConfig.base_url}`);
-            if (botConfig.spotify_configured) {
-                console.log(`Spotify integration: Enabled`);
-                console.log(`Spotify redirect URI: ${botConfig.spotify_redirect_uri}`);
-            } else {
-                console.log('Spotify integration: Disabled');
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching config:', error);
-        // Continue with default config
-        botConfig = {
-            domain: 'localhost',
-            base_url: window.location.origin,
-            spotify_configured: false
-        };
-    }
-}
-
 function startPolling() {
     // Initial fetch
     fetchStatus();
@@ -175,17 +191,20 @@ function startPolling() {
 async function fetchStatus() {
     try {
         const response = await fetch(`${API_URL}/status`);
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
+        
         const data = await response.json();
         
         if (data.success) {
             updateStatusDisplay(data);
             updateBotStatus('Online', true);
             lastStatusUpdate = Date.now();
-            
-            // Update config if base_url is provided in status
-            if (data.base_url && data.base_url !== botConfig.base_url) {
-                botConfig.base_url = data.base_url;
-            }
+            userHasAccess = data.user_has_access;
+            updateControlsAccess();
         } else {
             showMessage('error', `Status error: ${data.error}`, 'queueMessage');
         }
@@ -193,6 +212,40 @@ async function fetchStatus() {
         console.error('Error fetching status:', error);
         updateBotStatus('Offline', false);
         showMessage('error', 'Connection lost', 'queueMessage');
+    }
+}
+
+function updateControlsAccess() {
+    // Disable/enable controls based on user access
+    const controlButtons = [
+        elements.searchButton,
+        elements.playButton,
+        elements.pauseButton,
+        elements.skipButton,
+        elements.shuffleButton,
+        elements.clearQueueButton,
+        elements.leaveButton
+    ];
+    
+    controlButtons.forEach(btn => {
+        if (btn) {
+            if (!userHasAccess) {
+                btn.disabled = true;
+                btn.title = 'You do not have access to control this server';
+                btn.style.opacity = '0.3';
+            }
+        }
+    });
+    
+    // Also disable search input
+    if (elements.searchQuery && !userHasAccess) {
+        elements.searchQuery.disabled = true;
+        elements.searchQuery.placeholder = 'No access to this server';
+    }
+    
+    // Show access message
+    if (!userHasAccess) {
+        showMessage('error', 'You do not have access to control this server. Bot must be in a server you\'re a member of.', 'queueMessage');
     }
 }
 
@@ -219,10 +272,8 @@ function updateStatusDisplay(data) {
     // Update track info and progress
     if (data.current_track) {
         if (elements.currentTrack) {
-            const sourceIndicator = data.current_track.source === 'spotify' ? '🎵' : '🎥';
             elements.currentTrack.innerHTML = `
                 <div class="current-track-info">
-                    <span class="current-track-source">${sourceIndicator}</span>
                     <div class="current-track-title">${escapeHtml(data.current_track.title)}</div>
                     <div class="current-track-artist">${escapeHtml(data.current_track.artist)}</div>
                     <div class="current-track-duration">${escapeHtml(data.current_track.duration)}</div>
@@ -250,7 +301,9 @@ function updateStatusDisplay(data) {
     }
     
     if (elements.voiceChannel) {
-        elements.voiceChannel.textContent = data.voice_channel ? `(${data.voice_channel})` : '';
+        const channelText = data.voice_channel ? `(${data.voice_channel})` : '';
+        const guildText = data.guild_name ? ` - ${data.guild_name}` : '';
+        elements.voiceChannel.textContent = channelText + guildText;
     }
     
     // Update control button states
@@ -258,6 +311,9 @@ function updateStatusDisplay(data) {
 }
 
 function updateControlButtons(data) {
+    // Only update if user has access
+    if (!userHasAccess) return;
+    
     // Play button: Start if stopped, Resume if paused
     if (elements.playButton) {
         const canPlay = data.connected && (!data.playing || data.paused);
@@ -317,7 +373,7 @@ function updateBotStatus(status, isOnline) {
 
 // Search functionality
 async function handleSearch() {
-    if (isSearching) return;
+    if (isSearching || !userHasAccess) return;
     
     const query = elements.searchQuery?.value.trim();
     if (!query) {
@@ -341,24 +397,21 @@ async function handleSearch() {
             body: JSON.stringify({ query: query })
         });
         
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
+        
+        if (response.status === 403) {
+            showMessage('error', 'Access denied. You must be a member of the server.', 'searchMessage');
+            return;
+        }
+        
         const data = await response.json();
         
         if (data.success) {
             displaySearchResults(data.results);
-            
-            // Show service info in search message
-            const spotifyResults = data.results.filter(r => r.source === 'spotify').length;
-            const youtubeResults = data.results.filter(r => r.source === 'youtube').length;
-            let serviceInfo = '';
-            if (spotifyResults > 0 && youtubeResults > 0) {
-                serviceInfo = ` (${spotifyResults} Spotify, ${youtubeResults} YouTube)`;
-            } else if (spotifyResults > 0) {
-                serviceInfo = ' (Spotify)';
-            } else if (youtubeResults > 0) {
-                serviceInfo = ' (YouTube)';
-            }
-            
-            showMessage('success', `Found ${data.results.length} results${serviceInfo}`, 'searchMessage');
+            showMessage('success', `Found ${data.results.length} results`, 'searchMessage');
         } else {
             showMessage('error', `Search error: ${data.error}`, 'searchMessage');
         }
@@ -368,7 +421,7 @@ async function handleSearch() {
     } finally {
         isSearching = false;
         if (elements.searchButton) {
-            elements.searchButton.disabled = false;
+            elements.searchButton.disabled = !userHasAccess;
             elements.searchButton.innerHTML = '<i class="fas fa-search"></i>';
         }
     }
@@ -392,14 +445,16 @@ function displaySearchResults(results) {
                 <div class="search-result-artist">${escapeHtml(track.artist)}</div>
                 <div class="search-result-duration">${escapeHtml(track.duration)}</div>
             </div>
-            <button class="add-btn" data-song='${JSON.stringify(track)}'>Add</button>
+            <button class="add-btn" data-song='${JSON.stringify(track)}' ${!userHasAccess ? 'disabled' : ''}>Add</button>
         `;
         
         const addButton = li.querySelector('.add-btn');
-        addButton.addEventListener('click', (e) => {
-            const songData = JSON.parse(e.target.getAttribute('data-song'));
-            handleAddToQueue(songData, e.target);
-        });
+        if (userHasAccess) {
+            addButton.addEventListener('click', (e) => {
+                const songData = JSON.parse(e.target.getAttribute('data-song'));
+                handleAddToQueue(songData, e.target);
+            });
+        }
         
         elements.searchResults.appendChild(li);
     });
@@ -415,6 +470,12 @@ function clearSearchResults() {
 async function fetchQueue() {
     try {
         const response = await fetch(`${API_URL}/queue`);
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
+        
         const data = await response.json();
         
         if (data.success) {
@@ -457,7 +518,7 @@ function displayQueue(queue) {
             </div>
         `;
         
-        if (!item.current) {
+        if (!item.current && userHasAccess) {
             const removeButton = document.createElement('button');
             removeButton.className = 'queue-item-remove';
             removeButton.textContent = 'Remove';
@@ -473,6 +534,8 @@ function displayQueue(queue) {
 }
 
 async function handleAddToQueue(song, button) {
+    if (!userHasAccess) return;
+    
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = '...';
@@ -483,6 +546,18 @@ async function handleAddToQueue(song, button) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ song: song })
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
+        
+        if (response.status === 403) {
+            showMessage('error', 'Access denied', 'queueMessage');
+            button.textContent = originalText;
+            button.disabled = false;
+            return;
+        }
         
         const data = await response.json();
         
@@ -509,6 +584,8 @@ async function handleAddToQueue(song, button) {
 }
 
 async function handleRemoveFromQueue(index, button) {
+    if (!userHasAccess) return;
+    
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = '...';
@@ -519,6 +596,11 @@ async function handleRemoveFromQueue(index, button) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ index: index })
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -539,6 +621,8 @@ async function handleRemoveFromQueue(index, button) {
 
 // Control Functions
 async function handlePlay() {
+    if (!userHasAccess) return;
+    
     try {
         // If paused, resume. If stopped, start playing
         const endpoint = isPaused ? '/api/control/resume' : '/api/control/play';
@@ -546,6 +630,11 @@ async function handlePlay() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -564,11 +653,18 @@ async function handlePlay() {
 }
 
 async function handlePause() {
+    if (!userHasAccess) return;
+    
     try {
         const response = await fetch(`${API_URL}/control/pause`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -585,11 +681,18 @@ async function handlePause() {
 }
 
 async function handleShuffle() {
+    if (!userHasAccess) return;
+    
     try {
         const response = await fetch(`${API_URL}/queue/shuffle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -608,6 +711,8 @@ async function handleShuffle() {
 }
 
 async function handleLeave() {
+    if (!userHasAccess) return;
+    
     if (!confirm('Leave the voice channel? This will stop playback.')) {
         return;
     }
@@ -617,6 +722,11 @@ async function handleLeave() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -633,34 +743,19 @@ async function handleLeave() {
     }
 }
 
-async function handleStop() {
-    try {
-        const response = await fetch(`${API_URL}/control/stop`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showMessage('success', 'Stopped playback', 'queueMessage');
-            fetchStatus();
-            fetchQueue();
-        } else {
-            showMessage('error', `Error: ${data.error}`, 'queueMessage');
-        }
-    } catch (error) {
-        console.error('Stop request failed:', error);
-        showMessage('error', 'Failed to stop', 'queueMessage');
-    }
-}
-
 async function handleSkip() {
+    if (!userHasAccess) return;
+    
     try {
         const response = await fetch(`${API_URL}/control/skip`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -678,6 +773,8 @@ async function handleSkip() {
 }
 
 async function handleClearQueue() {
+    if (!userHasAccess) return;
+    
     if (!confirm('Are you sure you want to clear the entire queue?')) {
         return;
     }
@@ -687,6 +784,11 @@ async function handleClearQueue() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
+        
+        if (response.status === 401) {
+            window.location.href = '/auth';
+            return;
+        }
         
         const data = await response.json();
         
@@ -778,69 +880,22 @@ function stopConnectionMonitoring() {
     }
 }
 
-// Share functionality
-function copyDashboardUrl() {
-    const url = botConfig.base_url || window.location.origin;
-    navigator.clipboard.writeText(url).then(() => {
-        showMessage('success', 'Dashboard URL copied to clipboard!', 'queueMessage');
-    }).catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = url;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        showMessage('success', 'Dashboard URL copied to clipboard!', 'queueMessage');
-    });
-}
-
-// Expose share functionality globally
-window.copyDashboardUrl = copyDashboardUrl;
-
-// Start connection monitoring when page loads
-document.addEventListener('DOMContentLoaded', () => {
+// Start connection monitoring when authenticated
+function startPolling() {
+    // Initial fetch
+    fetchStatus();
+    fetchQueue();
+    
+    // Set up polling intervals
+    setInterval(fetchStatus, 3000);   // Poll status every 3 seconds
+    setInterval(fetchQueue, 5000);    // Poll queue every 5 seconds
+    setInterval(updateProgress, 1000); // Update progress every second
+    
+    // Start connection monitoring
     startConnectionMonitoring();
-});
+}
 
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {
     stopConnectionMonitoring();
-});
-
-// Add keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    // Only activate shortcuts if not typing in an input
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-    }
-    
-    switch (e.key) {
-        case ' ': // Spacebar for play/pause
-            e.preventDefault();
-            if (isPaused || !isPlaying) {
-                handlePlay();
-            } else {
-                handlePause();
-            }
-            break;
-        case 'ArrowRight': // Right arrow for skip
-            e.preventDefault();
-            handleSkip();
-            break;
-        case 's': // S for shuffle
-            e.preventDefault();
-            handleShuffle();
-            break;
-        case 'c': // C for clear queue
-            e.preventDefault();
-            handleClearQueue();
-            break;
-        case '/': // / to focus search
-            e.preventDefault();
-            if (elements.searchQuery) {
-                elements.searchQuery.focus();
-            }
-            break;
-    }
 });
