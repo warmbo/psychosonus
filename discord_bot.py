@@ -284,9 +284,9 @@ class MusicBot(commands.Bot):
         """Bot ready event"""
         logger.info(f'🎵 {self.user} is online!')
         port = self.config.get('port', 8888)
-        logger.info(f'🌐 Web dashboard: http://{domain}:{port}')
-        logger.info(f'🔐 Auth endpoint: http://{domain}:{port}/auth')
-    
+        logger.info(f'🌐 Web dashboard: https://{domain}:{port}')
+        logger.info(f'🔐 Auth endpoint: https://{domain}:{port}/auth')
+
     async def on_command_error(self, ctx, error):
         """Handle command errors"""
         if isinstance(error, commands.CommandNotFound):
