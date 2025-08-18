@@ -1,13 +1,23 @@
 {
-  "discord_token": "YOUR_DISCORD_BOT_TOKEN",
-  "discord_client_id": "YOUR_DISCORD_CLIENT_ID",
-  "discord_client_secret": "YOUR_DISCORD_CLIENT_SECRET",
+  "_comment": "=== REQUIRED DISCORD CONFIGURATION ===",
+  "discord_token": "YOUR_DISCORD_BOT_TOKEN_HERE",
+  "discord_client_id": "YOUR_DISCORD_CLIENT_ID_HERE", 
+  "discord_client_secret": "YOUR_DISCORD_CLIENT_SECRET_HERE",
+  
+  "_comment2": "=== BASIC SERVER CONFIGURATION ===",
+  "domain": "localhost",
+  "port": 8888,
+  
+  "_comment3": "=== OPTIONAL CONFIGURATION ===",
   "spotify_client_id": "SPOTIFY_CLIENT_ID_GOES_HERE",
   "spotify_client_secret": "SPOTIFY_CLIENT_SECRET_GOES_HERE",
-  "base_url": "localhost",
-  "use_https": false,
-  "web_port": 8888,
-  "command_prefix": "ps-",
+  "command_prefix": "!",
   "max_queue_size": 100,
-  "default_volume": 0.5,
+  "github_repo": "https://github.com/yourusername/psychosonus",
+  
+  "_comment4": "=== SETUP NOTES ===",
+  "_setup_localhost": "For localhost: domain='localhost', port=8888 (uses http://localhost:8888)",
+  "_setup_domain": "For production: domain='yourdomain.com', port=443 (uses https://yourdomain.com)",
+  "_setup_custom_port": "Custom port: domain='yourdomain.com', port=8080 (uses https://yourdomain.com:8080)",
+  "_discord_redirect": "Discord redirect URI will be: {protocol}://{domain}:{port}/auth/callback"
 }
