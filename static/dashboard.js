@@ -51,9 +51,25 @@ const elements = {
 document.addEventListener('DOMContentLoaded', () => {
     initializeElements();
     setupEventListeners();
+    setupLogoErrorHandling();
     startPolling();
     updateBotStatus('Connecting...', false);
 });
+
+function setupLogoErrorHandling() {
+    const logoImg = document.getElementById('botLogo');
+    if (logoImg) {
+        logoImg.addEventListener('error', () => {
+            logoImg.classList.add('error');
+            console.log('Logo image failed to load, hiding logo');
+        });
+        
+        logoImg.addEventListener('load', () => {
+            logoImg.classList.remove('error');
+            console.log('Logo image loaded successfully');
+        });
+    }
+}
 
 function initializeElements() {
     // Get all DOM elements
@@ -557,12 +573,6 @@ async function handleLeave() {
     } catch (error) {
         console.error('Leave request failed:', error);
         showMessage('error', 'Failed to leave channel', 'queueMessage');
-    }
-}
-
-    } catch (error) {
-        console.error('Resume request failed:', error);
-        showMessage('error', 'Failed to resume', 'queueMessage');
     }
 }
 

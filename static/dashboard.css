@@ -6,7 +6,15 @@
 .pause-btn:hover {
     background-color: #ffbb22;
     transform: translateY(-1px);
-}/* Reset and Base Styles */
+}/* Custom Font */
+@font-face {
+    font-family: 'UrbanChristmas';
+    src: url('/static/urban_christmas.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Reset and Base Styles */
 * {
     margin: 0;
     padding: 0;
@@ -57,15 +65,42 @@ body {
     animation: fadeInUp 1s ease-out;
 }
 
+.logo-container {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.bot-logo-image {
+    max-width: 220px;
+    max-height: 220px;
+    width: auto;
+    height: auto;
+    transition: all 0.3s ease-in;
+    border: 0;
+}
+
+.bot-logo-image:hover {
+    transform: scale(1.05) rotateX(10deg);
+}
+
+.bot-logo-image.error {
+    display: none;
+}
+
 .bot-name {
-    font-size: 3.5rem;
-    font-weight: bold;
+    font-family: 'UrbanChristmas', 'Consolas', 'Monaco', 'Lucida Console', monospace;
+    font-size: 4rem;
+    font-weight: normal;
     margin-bottom: 10px;
-    background: linear-gradient(45deg, #ffffff, #cccccc);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    text-shadow: 
+        0 0 10px rgba(255, 0, 0, 0.8),
+        0 0 20px rgba(255, 0, 0, 0.5),
+        0 0 30px rgba(255, 0, 0, 0.3),
+        2px 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 2px;
 }
 
 .bot-subtitle {
@@ -73,6 +108,7 @@ body {
     color: #aaaaaa;
     margin-bottom: 30px;
     letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
 }
 
 .bot-status {
@@ -94,10 +130,12 @@ body {
 
 .status-indicator.online {
     background-color: #00ff88;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
 }
 
 .status-indicator.offline {
     background-color: #ff4444;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
 }
 
 /* Section Headers */
@@ -107,12 +145,14 @@ h2 {
     color: #ffffff;
     border-bottom: 2px solid #333;
     padding-bottom: 5px;
+    text-shadow: 0 0 8px rgba(255, 0, 0, 0.3);
 }
 
 h3 {
     font-size: 1.1rem;
     margin-bottom: 12px;
     color: #cccccc;
+    text-shadow: 0 0 5px rgba(255, 0, 0, 0.2);
 }
 
 /* Status Section */
@@ -128,6 +168,7 @@ h3 {
     border: 1px solid #333;
     border-radius: 6px;
     gap: 15px;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
 }
 
 .status-item {
@@ -171,6 +212,7 @@ h3 {
     align-items: center;
     color: #ffffff;
     font-size: 0.95rem;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
 }
 
 /* Control Buttons */
@@ -201,12 +243,12 @@ h3 {
     background-color: #2a2a2a;
     border-color: #555555;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3), 0 0 20px rgba(255, 0, 0, 0.1);
 }
 
 .control-btn:active:not(:disabled) {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 6px rgba(255, 0, 0, 0.3);
 }
 
 .control-btn:disabled {
@@ -227,7 +269,7 @@ h3 {
 .control-btn.active {
     background-color: #2a2a2a;
     border-color: #666666;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.4), 0 0 30px rgba(255, 0, 0, 0.2);
 }
 
 /* Progress Section */
@@ -254,10 +296,11 @@ h3 {
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #00aa44, #00ff88);
+    background: linear-gradient(90deg, #ff0000, #ff4444);
     width: 0%;
     transition: width 0.3s ease;
     border-radius: 3px;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
 }
 
 .progress-bar::after {
@@ -267,7 +310,7 @@ h3 {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.3), transparent);
     animation: shimmer 2s infinite;
 }
 
@@ -302,6 +345,7 @@ h3 {
     outline: none;
     border-color: #555;
     background-color: #1a1a1a;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
 }
 
 .search-input::placeholder {
@@ -323,6 +367,7 @@ h3 {
     background-color: #2a2a2a;
     border-color: #555555;
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
 }
 
 .search-btn i {
@@ -546,7 +591,12 @@ h3 {
     }
     
     .bot-name {
-        font-size: 2.5rem;
+        font-size: 3.5m;
+    }
+    
+    .bot-logo-image {
+        max-width: 180px;
+        max-height: 180px;
     }
     
     body {
