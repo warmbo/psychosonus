@@ -4,278 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Psychosonus Dashboard</title>
-    <style>
-        body {
-            font-family: monospace;
-            background-color: #f0f0f0;
-            color: #333;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 800px;
-            margin: auto;
-            background-color: #fff;
-            padding: 20px;
-            border: 1px solid #ccc;
-        }
-        input, button {
-            padding: 8px;
-            margin: 5px 0;
-            border: 1px solid #ccc;
-            font-family: monospace;
-        }
-        button {
-            cursor: pointer;
-            background-color: #eee;
-        }
-        button:hover {
-            background-color: #ddd;
-        }
-        #searchResults {
-            margin-top: 20px;
-            list-style-type: none;
-            padding: 0;
-        }
-        .searchResultItem {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .queueItem {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
+    <div class="main-container">
+        <!-- Left Panel: Queue and Status -->
+        <div class="left-panel">
+            <div class="status-section">
+                <h2>Status</h2>
+                <div class="status-compact">
+                    <span class="status-item">
+                        <span class="status-label">Voice:</span>
+                        <span id="connectedStatus" class="status-value">No</span>
+                        <span id="voiceChannel" class="status-detail"></span>
+                    </span>
+                    <span class="status-item">
+                        <span class="status-label">Playing:</span>
+                        <span id="voicePlayingStatus" class="status-value">No</span>
+                    </span>
+                    <span class="status-item">
+                        <span class="status-label">Queue:</span>
+                        <span id="queueSize" class="status-value">0</span>
+                    </span>
+                </div>
+            </div>
 
-    <div class="container">
-        <h1>Psychosonus Dashboard</h1>
-        <p>A simple control panel for your Discord music bot.</p>
+            <div class="current-track-section">
+                <h3>Now Playing</h3>
+                <div id="currentTrack" class="current-track">-</div>
+            </div>
 
-        <hr>
+            <div class="queue-controls">
+                <button id="playButton" class="control-btn play-btn">▶️ Play</button>
+                <button id="pauseButton" class="control-btn pause-btn">⏸️ Pause</button>
+                <button id="skipButton" class="control-btn skip-btn">⏭️ Skip</button>
+                <button id="clearQueueButton" class="control-btn clear-btn">🗑️ Clear</button>
+            </div>
 
-        <h2>Status</h2>
-        <div id="status">
-            <p><strong>Connected to Voice:</strong> <span id="connectedStatus">No</span></p>
-            <p><strong>Is Playing:</strong> <span id="playingStatus">No</span></p>
-            <p><strong>Current Track:</strong> <span id="currentTrack">-</span></p>
-            <p><strong>Queue Size:</strong> <span id="queueSize">0</span></p>
+            <div class="queue-section">
+                <h3>Queue</h3>
+                <div id="queueMessage" class="message"></div>
+                <ul id="queueList" class="queue-list"></ul>
+            </div>
         </div>
 
-        <hr>
-
-        <h2>Search</h2>
-        <div>
-            <input type="text" id="searchQuery" placeholder="Search for a song or artist...">
-            <button id="searchButton">Search</button>
+        <!-- Center Panel: Bot Name -->
+        <div class="center-panel">
+            <div class="bot-logo">
+                <h1 class="bot-name">Psychosonus</h1>
+                <p class="bot-subtitle">Discord Music Bot</p>
+                <div class="bot-status">
+                    <div class="status-indicator" id="botStatusIndicator"></div>
+                    <span id="botStatusText">Initializing...</span>
+                </div>
+            </div>
         </div>
-        <div id="searchMessage"></div>
-        <ul id="searchResults"></ul>
 
-        <hr>
+        <!-- Right Panel: Search and Results -->
+        <div class="right-panel">
+            <div class="search-section">
+                <h2>Search</h2>
+                <div class="search-input-container">
+                    <input type="text" id="searchQuery" placeholder="Search for a song or artist..." class="search-input">
+                    <button id="searchButton" class="search-btn">🔍</button>
+                </div>
+                <div id="searchMessage" class="message"></div>
+            </div>
 
-        <h2>Queue</h2>
-        <div>
-            <button id="skipButton">Skip</button>
-            <button id="clearQueueButton">Clear Queue</button>
+            <div class="results-section">
+                <h3>Results</h3>
+                <ul id="searchResults" class="search-results"></ul>
+            </div>
         </div>
-        <div id="queueMessage"></div>
-        <ul id="queueList"></ul>
     </div>
 
-    <script>
-        const API_URL = '/api';
-
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchStatus();
-            fetchQueue();
-            setInterval(fetchStatus, 5000); // Poll status every 5 seconds
-            setInterval(fetchQueue, 5000); // Poll queue every 5 seconds
-
-            document.getElementById('searchButton').addEventListener('click', searchMusic);
-            document.getElementById('searchQuery').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    searchMusic();
-                }
-            });
-            document.getElementById('skipButton').addEventListener('click', skipSong);
-            document.getElementById('clearQueueButton').addEventListener('click', clearQueue);
-        });
-
-        async function fetchStatus() {
-            try {
-                const response = await fetch(`${API_URL}/status`);
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('connectedStatus').textContent = data.connected ? 'Yes' : 'No';
-                    document.getElementById('playingStatus').textContent = data.playing ? 'Yes' : 'No';
-                    document.getElementById('queueSize').textContent = data.queue_size;
-                    document.getElementById('currentTrack').textContent = data.current_track ? `${data.current_track.title} by ${data.current_track.artist}` : '-';
-                }
-            } catch (error) {
-                console.error('Error fetching status:', error);
-            }
-        }
-
-        async function searchMusic() {
-            const query = document.getElementById('searchQuery').value.trim();
-            const searchMessageEl = document.getElementById('searchMessage');
-            const searchResultsEl = document.getElementById('searchResults');
-            searchResultsEl.innerHTML = '';
-            searchMessageEl.textContent = 'Searching...';
-
-            if (!query) {
-                searchMessageEl.textContent = 'Please enter a search query.';
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_URL}/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: query })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    searchMessageEl.textContent = `${data.results.length} results found.`;
-                    data.results.forEach(track => {
-                        const li = document.createElement('li');
-                        li.className = 'searchResultItem';
-                        li.innerHTML = `
-                            <span><strong>${track.title}</strong> by ${track.artist} (${track.duration})</span>
-                            <button data-song='${JSON.stringify(track)}'>Add to Queue</button>
-                        `;
-                        li.querySelector('button').addEventListener('click', (e) => {
-                            const songData = JSON.parse(e.target.getAttribute('data-song'));
-                            addSongToQueue(songData);
-                        });
-                        searchResultsEl.appendChild(li);
-                    });
-                } else {
-                    searchMessageEl.textContent = `Error: ${data.error}`;
-                }
-            } catch (error) {
-                console.error('Search request failed:', error);
-                searchMessageEl.textContent = 'Search failed. Please check the server connection.';
-            }
-        }
-
-        async function fetchQueue() {
-            try {
-                const response = await fetch(`${API_URL}/queue`);
-                const data = await response.json();
-                const queueListEl = document.getElementById('queueList');
-                queueListEl.innerHTML = '';
-                if (data.success && data.queue.length > 0) {
-                    data.queue.forEach((item, index) => {
-                        const li = document.createElement('li');
-                        li.className = 'queueItem';
-                        const song = item.song;
-                        li.innerHTML = `
-                            <span>${item.current ? '▶️ ' : `${index}. `}<strong>${song.title}</strong> by ${song.artist} (${song.duration})</span>
-                        `;
-                        if (!item.current) {
-                            const removeButton = document.createElement('button');
-                            removeButton.textContent = 'Remove';
-                            removeButton.style.marginLeft = '10px';
-                            removeButton.addEventListener('click', () => removeSongFromQueue(index - (data.queue.length - data.queue.filter(q => !q.current).length)));
-                            li.appendChild(removeButton);
-                        }
-                        queueListEl.appendChild(li);
-                    });
-                } else {
-                    queueListEl.innerHTML = '<li>The queue is empty.</li>';
-                }
-            } catch (error) {
-                console.error('Error fetching queue:', error);
-            }
-        }
-
-        async function addSongToQueue(song) {
-            try {
-                const response = await fetch(`${API_URL}/queue/add`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ song: song })
-                });
-                const data = await response.json();
-                const queueMessageEl = document.getElementById('queueMessage');
-                if (data.success) {
-                    queueMessageEl.textContent = `Added "${song.title}" to queue.`;
-                    fetchQueue();
-                } else {
-                    queueMessageEl.textContent = `Error adding song: ${data.error}`;
-                }
-            } catch (error) {
-                console.error('Add to queue request failed:', error);
-                queueMessageEl.textContent = 'Failed to add song. Check server.';
-            }
-        }
-
-        async function removeSongFromQueue(index) {
-            try {
-                const response = await fetch(`${API_URL}/queue/remove`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ index: index })
-                });
-                const data = await response.json();
-                const queueMessageEl = document.getElementById('queueMessage');
-                if (data.success) {
-                    queueMessageEl.textContent = `Removed song at index ${index + 1} from queue.`;
-                    fetchQueue();
-                } else {
-                    queueMessageEl.textContent = `Error removing song: ${data.error}`;
-                }
-            } catch (error) {
-                console.error('Remove from queue request failed:', error);
-                queueMessageEl.textContent = 'Failed to remove song. Check server.';
-            }
-        }
-
-        async function skipSong() {
-            try {
-                const response = await fetch(`${API_URL}/control/skip`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                const queueMessageEl = document.getElementById('queueMessage');
-                if (data.success) {
-                    queueMessageEl.textContent = 'Skipped current song.';
-                    fetchQueue();
-                } else {
-                    queueMessageEl.textContent = `Error skipping song: ${data.error}`;
-                }
-            } catch (error) {
-                console.error('Skip request failed:', error);
-                queueMessageEl.textContent = 'Failed to skip. Check server.';
-            }
-        }
-
-        async function clearQueue() {
-            try {
-                const response = await fetch(`${API_URL}/queue/clear`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                const queueMessageEl = document.getElementById('queueMessage');
-                if (data.success) {
-                    queueMessageEl.textContent = 'Queue cleared.';
-                    fetchQueue();
-                } else {
-                    queueMessageEl.textContent = `Error clearing queue: ${data.error}`;
-                }
-            } catch (error) {
-                console.error('Clear queue request failed:', error);
-                queueMessageEl.textContent = 'Failed to clear queue. Check server.';
-            }
-        }
-    </script>
+    <script src="/static/dashboard.js"></script>
 </body>
 </html>
