@@ -285,6 +285,7 @@ class MusicBot(commands.Bot):
         """Bot ready event"""
         logger.info(f'🎵 {self.user} is online!')
         port = self.config.get('port', 8888)
+        domain = self.config.get_domain()
         logger.info(f'🌐 Web dashboard: https://{domain}:{port}')
         logger.info(f'🔐 Auth endpoint: https://{domain}:{port}/auth')
 
