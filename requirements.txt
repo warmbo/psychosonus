@@ -1,9 +1,6 @@
 # Discord Bot Dependencies
 discord.py>=2.3.0
 
-# YouTube Integration
-yt-dlp>=2023.7.6
-
 # Web Interface
 flask>=2.3.0
 
@@ -13,5 +10,8 @@ requests>=2.31.0
 # Audio Processing (Discord voice)
 PyNaCl>=1.5.0
 
-# Optional: Spotify Integration (if needed later)
-# spotipy>=2.22.1
+# Spotify Integration
+spotipy>=2.22.1
+
+# Optional: YouTube Integration (if needed as fallback)
+# yt-dlp>=2023.7.6
