@@ -62,6 +62,7 @@ class MusicBot(commands.Bot):
                 self.current_channel = ctx.channel
                 self.current_guild_id = ctx.guild.id
                 port = self.config.get('port', 8888)
+                domain = self.config.get_domain()
                 await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: https://{domain}:{port}")
                 
                 if not self.is_playing:
@@ -143,12 +144,12 @@ class MusicBot(commands.Bot):
             
             embed = discord.Embed(
                 title="🌐 Web Dashboard",
-                description=f"Access the web interface at: http://{domain}:{port}",
+                description=f"Access the web interface at: https://{domain}:{port}",
                 color=0x00ff88
             )
             embed.add_field(
                 name="Authentication Required",
-                value=f"Sign in with Discord at: http://{domain}:{port}/auth",
+                value=f"Sign in with Discord at: https://{domain}:{port}/auth",
                 inline=False
             )
             embed.add_field(
