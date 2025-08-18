@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Sonus Bot Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-container {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .search-box {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-box::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .search-box:focus {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.02);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff4757, #ff3742);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+        }
+
+        .btn-small {
+            padding: 8px 15px;
+            font-size: 12px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .song-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .song-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .song-item.now-playing {
+            border-left-color: #FFD700;
+            background: linear-gradient(90deg, rgba(255, 215, 0, 0.2), rgba(255, 255, 255, 0.1));
+        }
+
+        .song-details {
+            margin-bottom: 10px;
+        }
+
+        .song-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .song-artist {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+
+        .queue-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .queue-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            opacity: 0.7;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            opacity: 0.7;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+            background: #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .search-results {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .search-results::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .search-results::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .search-results::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .queue-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .queue-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .queue-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .queue-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">
+        <span class="status-indicator"></span>
+        Connected
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Sonus Bot Dashboard</h1>
+            <p>Search, queue, and control your music experience</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- Search Section -->
+            <div class="card">
+                <h3>🔍 Search Music</h3>
+                <div class="search-container">
+                    <input type="text" id="searchInput" class="search-box" placeholder="Search YouTube for music..." autocomplete="off">
+                    <button class="btn" onclick="searchMusic()">Search</button>
+                </div>
+                <div id="searchResults" class="search-results"></div>
+            </div>
+
+            <!-- Queue Section -->
+            <div class="card">
+                <h3>🎼 Current Queue</h3>
+                <div class="control-buttons">
+                    <button class="btn btn-secondary btn-small" onclick="refreshQueue()">🔄 Refresh</button>
+                    <button class="btn btn-danger btn-small" onclick="clearQueue()">🗑️ Clear Queue</button>
+                </div>
+                <div id="queueList" class="queue-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isSearching = false;
+        let connectionStatus = true;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshQueue();
+            setInterval(refreshQueue, 5000); // Auto-refresh every 5 seconds
+            
+            // Enter key search
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchMusic();
+                }
+            });
+        });
+
+        async function searchMusic() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query || isSearching) return;
+            
+            isSearching = true;
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '<div class="loading">🔍 Searching for music...</div>';
+            
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: query})
+                });
+                
+                if (!response.ok) throw new Error('Search failed');
+                
+                const data = await response.json();
+                displaySearchResults(data.results || []);
+                updateConnectionStatus(true);
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResults.innerHTML = '<div class="empty-state">❌ Search failed. Please try again.</div>';
+                updateConnectionStatus(false);
+            } finally {
+                isSearching = false;
+            }
+        }
+        
+        function displaySearchResults(results) {
+            const searchResults = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                searchResults.innerHTML = '<div class="empty-state">🔍 No results found</div>';
+                return;
+            }
+            
+            const html = results.map(song => `
+                <div class="song-item">
+                    <div class="song-details">
+                        <div class="song-title">${escapeHtml(song.title)}</div>
+                        <div class="song-artist">${escapeHtml(song.artist)} • ${song.duration}</div>
+                    </div>
+                    <button class="btn btn-small" onclick="addToQueue(${escapeHtml(JSON.stringify(song))})">
+                        ➕ Add to Queue
+                    </button>
+                </div>
+            `).join('');
+            
+            searchResults.innerHTML = html;
+        }
+        
+        async function addToQueue(song) {
+            try {
+                const response = await fetch('/api/queue/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({song: song})
+                });
+                
+                if (!response.ok) throw new Error('Failed to add to queue');
+                
+                // Show success feedback
+                showNotification('🎵 Added to queue!', 'success');
+                refreshQueue();
+                updateConnectionStatus(true);
+            } catch (error) {
+                console.error('Add to queue error:', error);
+                showNotification('❌ Failed to add to queue', 'error');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        async function refreshQueue() {
+            try {
+                const response = await fetch('/api/queue');
+                if (!response.ok) throw new Error('Failed to fetch queue');
+                
+                const data = await response.json();
+                displayQueue(data.queue || []);
+                updateConnectionStatus(true);
+            } catch (error) {
+                console.error('Queue refresh error:', error);
+                document.getElementById('queueList').innerHTML = '<div class="empty-state">❌ Failed to load queue</div>';
+                updateConnectionStatus(false);
+            }
+        }
+        
+        function displayQueue(queue) {
+            const queueList = document.getElementById('queueList');
+            
+            if (queue.length === 0) {
+                queueList.innerHTML = '<div class="empty-state">📭 Queue is empty<br><small>Search and add some music!</small></div>';
+                return;
+            }
+            
+            const html = queue.map((item, index) => `
+                <div class="song-item queue-item ${index === 0 ? 'now-playing' : ''}">
+                    <div class="song-details">
+                        <div class="song-title">
+                            ${index === 0 ? '▶️ ' : `${index}. `}${escapeHtml(item.song.title)}
+                        </div>
+                        <div class="song-artist">${escapeHtml(item.song.artist)}</div>
+                    </div>
+                    <div class="queue-controls">
+                        ${index > 0 ? `<button class="btn btn-danger btn-small" onclick="removeFromQueue(${index})">🗑️ Remove</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            queueList.innerHTML = html;
+        }
+        
+        async function removeFromQueue(index) {
+            try {
+                const response = await fetch('/api/queue/remove', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index: index})
+                });
+                
+                if (!response.ok) throw new Error('Failed to remove from queue');
+                
+                showNotification('🗑️ Removed from queue', 'success');
+                refreshQueue();
+                updateConnectionStatus(true);
+            } catch (error) {
+                console.error('Remove from queue error:', error);
+                showNotification('❌ Failed to remove from queue', 'error');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        async function clearQueue() {
+            if (!confirm('Are you sure you want to clear the entire queue?')) return;
+            
+            try {
+                const response = await fetch('/api/queue/clear', {method: 'POST'});
+                if (!response.ok) throw new Error('Failed to clear queue');
+                
+                showNotification('🗑️ Queue cleared', 'success');
+                refreshQueue();
+                updateConnectionStatus(true);
+            } catch (error) {
+                console.error('Clear queue error:', error);
+                showNotification('❌ Failed to clear queue', 'error');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const indicator = statusElement.querySelector('.status-indicator');
+            
+            if (connected) {
+                statusElement.innerHTML = '<span class="status-indicator"></span>Connected';
+                indicator.style.background = '#4ecdc4';
+            } else {
+                statusElement.innerHTML = '<span class="status-indicator"></span>Disconnected';
+                indicator.style.background = '#ff4757';
+            }
+            
+            connectionStatus = connected;
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${type === 'success' ? 'rgba(78, 205, 196, 0.9)' : 'rgba(255, 71, 87, 0.9)'};
+                color: white;
+                padding: 15px 20px;
+                border-radius: 10px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            `;
+            notification.textContent = message;
+            
+            // Add animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+                style.remove();
+            }, 3000);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
