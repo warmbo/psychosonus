@@ -175,7 +175,7 @@ class WebInterface:
         
         @self.app.route('/api/control/pause', methods=['POST'])
         def pause_song():
-            """Pause/resume current song"""
+            """Pause current song"""
             try:
                 if not self.bot.voice_client:
                     return jsonify({'success': False, 'error': 'Bot not connected to voice channel'})
@@ -183,13 +183,44 @@ class WebInterface:
                 if self.bot.voice_client.is_playing():
                     self.bot.voice_client.pause()
                     return jsonify({'success': True, 'message': 'Paused'})
-                elif self.bot.voice_client.is_paused():
+                else:
+                    return jsonify({'success': False, 'error': 'Nothing is playing'})
+            except Exception as e:
+                logger.error(f"Pause error: {e}")
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/control/resume', methods=['POST'])
+        def resume_song():
+            """Resume current song"""
+            try:
+                if not self.bot.voice_client:
+                    return jsonify({'success': False, 'error': 'Bot not connected to voice channel'})
+                
+                if self.bot.voice_client.is_paused():
                     self.bot.voice_client.resume()
                     return jsonify({'success': True, 'message': 'Resumed'})
                 else:
-                    return jsonify({'success': False, 'error': 'Nothing to pause/resume'})
+                    return jsonify({'success': False, 'error': 'Nothing is paused'})
             except Exception as e:
-                logger.error(f"Pause error: {e}")
+                logger.error(f"Resume error: {e}")
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/control/stop', methods=['POST'])
+        def stop_song():
+            """Stop current song and clear current track"""
+            try:
+                if not self.bot.voice_client:
+                    return jsonify({'success': False, 'error': 'Bot not connected to voice channel'})
+                
+                if self.bot.voice_client.is_playing() or self.bot.voice_client.is_paused():
+                    self.bot.voice_client.stop()
+                    self.bot.is_playing = False
+                    self.bot.music_queue.current_track = None
+                    return jsonify({'success': True, 'message': 'Stopped'})
+                else:
+                    return jsonify({'success': False, 'error': 'Nothing is playing'})
+            except Exception as e:
+                logger.error(f"Stop error: {e}")
                 return jsonify({'success': False, 'error': str(e)})
         
         @self.app.route('/api/control/skip', methods=['POST'])
@@ -225,6 +256,41 @@ class WebInterface:
                 return jsonify({'success': True})
             except Exception as e:
                 logger.error(f"Force play error: {e}")
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/queue/shuffle', methods=['POST'])
+        def shuffle_queue():
+            """Shuffle the queue"""
+            try:
+                import random
+                with self.bot.music_queue._lock:
+                    queue_list = list(self.bot.music_queue.queue)
+                    random.shuffle(queue_list)
+                    self.bot.music_queue.queue = type(self.bot.music_queue.queue)(queue_list)
+                
+                return jsonify({'success': True, 'message': 'Queue shuffled'})
+            except Exception as e:
+                logger.error(f"Shuffle error: {e}")
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/control/leave', methods=['POST'])
+        def leave_channel():
+            """Leave voice channel"""
+            try:
+                if self.bot.voice_client:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.bot.voice_client.disconnect(), 
+                        self.bot.loop
+                    )
+                    future.result(timeout=5)
+                    self.bot.voice_client = None
+                    self.bot.is_playing = False
+                    self.bot.current_channel = None
+                    return jsonify({'success': True, 'message': 'Left voice channel'})
+                else:
+                    return jsonify({'success': False, 'error': 'Not connected to voice channel'})
+            except Exception as e:
+                logger.error(f"Leave error: {e}")
                 return jsonify({'success': False, 'error': str(e)})
         
         @self.app.route('/api/status')

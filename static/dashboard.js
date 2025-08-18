@@ -5,6 +5,11 @@ const API_URL = '/api';
 let isSearching = false;
 let lastQueueUpdate = 0;
 let lastStatusUpdate = 0;
+let trackStartTime = 0;
+let trackDuration = 0;
+let isPlaying = false;
+let isPaused = false;
+let isShuffleEnabled = false;
 
 // DOM Elements
 const elements = {
@@ -32,7 +37,14 @@ const elements = {
     playButton: null,
     pauseButton: null,
     skipButton: null,
-    clearQueueButton: null
+    shuffleButton: null,
+    clearQueueButton: null,
+    leaveButton: null,
+    
+    // Progress elements
+    currentTime: null,
+    totalTime: null,
+    progressFill: null
 };
 
 // Initialize dashboard
@@ -82,8 +94,16 @@ function setupEventListeners() {
         elements.skipButton.addEventListener('click', handleSkip);
     }
     
+    if (elements.shuffleButton) {
+        elements.shuffleButton.addEventListener('click', handleShuffle);
+    }
+    
     if (elements.clearQueueButton) {
         elements.clearQueueButton.addEventListener('click', handleClearQueue);
+    }
+    
+    if (elements.leaveButton) {
+        elements.leaveButton.addEventListener('click', handleLeave);
     }
 }
 
@@ -95,6 +115,7 @@ function startPolling() {
     // Set up polling intervals
     setInterval(fetchStatus, 3000);   // Poll status every 3 seconds
     setInterval(fetchQueue, 5000);    // Poll queue every 5 seconds
+    setInterval(updateProgress, 1000); // Update progress every second
 }
 
 // Status Management
@@ -124,16 +145,22 @@ function updateStatusDisplay(data) {
     }
     
     if (elements.voicePlayingStatus) {
-        elements.voicePlayingStatus.textContent = data.playing ? 'Yes' : 'No';
-        elements.voicePlayingStatus.style.color = data.playing ? '#00ff88' : '#ff4444';
+        const statusText = data.paused ? 'Paused' : (data.playing ? 'Yes' : 'No');
+        elements.voicePlayingStatus.textContent = statusText;
+        elements.voicePlayingStatus.style.color = data.playing ? '#00ff88' : (data.paused ? '#ffaa00' : '#ff4444');
     }
     
     if (elements.queueSize) {
         elements.queueSize.textContent = data.queue_size || '0';
     }
     
-    if (elements.currentTrack) {
-        if (data.current_track) {
+    // Update global state
+    isPlaying = data.playing;
+    isPaused = data.paused;
+    
+    // Update track info and progress
+    if (data.current_track) {
+        if (elements.currentTrack) {
             elements.currentTrack.innerHTML = `
                 <div class="current-track-info">
                     <div class="current-track-title">${escapeHtml(data.current_track.title)}</div>
@@ -141,9 +168,25 @@ function updateStatusDisplay(data) {
                     <div class="current-track-duration">${escapeHtml(data.current_track.duration)}</div>
                 </div>
             `;
-        } else {
+        }
+        
+        // Parse duration and set track info
+        const duration = data.current_track.duration;
+        if (duration && duration.includes(':')) {
+            const [mins, secs] = duration.split(':').map(Number);
+            trackDuration = (mins * 60) + secs;
+        }
+        
+        // Reset start time if track changed
+        if (data.track_changed || trackStartTime === 0) {
+            trackStartTime = Date.now() / 1000;
+        }
+    } else {
+        if (elements.currentTrack) {
             elements.currentTrack.textContent = 'Nothing playing';
         }
+        trackDuration = 0;
+        trackStartTime = 0;
     }
     
     if (elements.voiceChannel) {
@@ -155,19 +198,50 @@ function updateStatusDisplay(data) {
 }
 
 function updateControlButtons(data) {
+    // Play button: Start if stopped, Resume if paused
     if (elements.playButton) {
-        elements.playButton.disabled = !data.connected || data.playing;
-        elements.playButton.style.opacity = elements.playButton.disabled ? '0.5' : '1';
+        const canPlay = data.connected && (!data.playing || data.paused);
+        elements.playButton.disabled = !canPlay;
+        elements.playButton.style.opacity = elements.playButton.disabled ? '0.3' : '1';
+        
+        // Change button icon based on state
+        if (data.paused) {
+            elements.playButton.innerHTML = '<i class="fas fa-play"></i>'; // Resume icon
+            elements.playButton.title = 'Resume';
+        } else {
+            elements.playButton.innerHTML = '<i class="fas fa-play"></i>'; // Play icon
+            elements.playButton.title = 'Play';
+        }
     }
     
+    // Pause button: enabled when playing and not paused
     if (elements.pauseButton) {
-        elements.pauseButton.disabled = !data.playing;
-        elements.pauseButton.style.opacity = elements.pauseButton.disabled ? '0.5' : '1';
+        elements.pauseButton.disabled = !data.playing || data.paused;
+        elements.pauseButton.style.opacity = elements.pauseButton.disabled ? '0.3' : '1';
     }
     
+    // Skip button: enabled when playing (paused or not) or when queue has items
     if (elements.skipButton) {
-        elements.skipButton.disabled = !data.playing;
-        elements.skipButton.style.opacity = elements.skipButton.disabled ? '0.5' : '1';
+        elements.skipButton.disabled = !data.connected || (!data.playing && !data.paused && data.queue_size === 0);
+        elements.skipButton.style.opacity = elements.skipButton.disabled ? '0.3' : '1';
+    }
+    
+    // Shuffle button: always enabled when connected
+    if (elements.shuffleButton) {
+        elements.shuffleButton.disabled = !data.connected;
+        elements.shuffleButton.style.opacity = elements.shuffleButton.disabled ? '0.3' : '1';
+    }
+    
+    // Clear button: enabled when connected and queue has items
+    if (elements.clearQueueButton) {
+        elements.clearQueueButton.disabled = !data.connected || data.queue_size === 0;
+        elements.clearQueueButton.style.opacity = elements.clearQueueButton.disabled ? '0.3' : '1';
+    }
+    
+    // Leave button: enabled when connected
+    if (elements.leaveButton) {
+        elements.leaveButton.disabled = !data.connected;
+        elements.leaveButton.style.opacity = elements.leaveButton.disabled ? '0.3' : '1';
     }
 }
 
@@ -197,7 +271,7 @@ async function handleSearch() {
     
     if (elements.searchButton) {
         elements.searchButton.disabled = true;
-        elements.searchButton.textContent = '⏳';
+        elements.searchButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     }
     
     try {
@@ -222,7 +296,7 @@ async function handleSearch() {
         isSearching = false;
         if (elements.searchButton) {
             elements.searchButton.disabled = false;
-            elements.searchButton.textContent = '🔍';
+            elements.searchButton.innerHTML = '<i class="fas fa-search"></i>';
         }
     }
 }
@@ -393,7 +467,9 @@ async function handleRemoveFromQueue(index, button) {
 // Control Functions
 async function handlePlay() {
     try {
-        const response = await fetch(`${API_URL}/control/play`, {
+        // If paused, resume. If stopped, start playing
+        const endpoint = isPaused ? '/api/control/resume' : '/api/control/play';
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -401,7 +477,8 @@ async function handlePlay() {
         const data = await response.json();
         
         if (data.success) {
-            showMessage('success', 'Started playing', 'queueMessage');
+            const message = isPaused ? 'Resumed playback' : 'Started playing';
+            showMessage('success', message, 'queueMessage');
             fetchQueue();
             fetchStatus();
         } else {
@@ -431,6 +508,83 @@ async function handlePause() {
     } catch (error) {
         console.error('Pause request failed:', error);
         showMessage('error', 'Failed to pause', 'queueMessage');
+    }
+}
+
+async function handleShuffle() {
+    try {
+        const response = await fetch(`${API_URL}/queue/shuffle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            isShuffleEnabled = !isShuffleEnabled;
+            elements.shuffleButton.classList.toggle('active', isShuffleEnabled);
+            showMessage('success', `Shuffle ${isShuffleEnabled ? 'enabled' : 'disabled'}`, 'queueMessage');
+            fetchQueue();
+        } else {
+            showMessage('error', `Error: ${data.error}`, 'queueMessage');
+        }
+    } catch (error) {
+        console.error('Shuffle request failed:', error);
+        showMessage('error', 'Failed to shuffle', 'queueMessage');
+    }
+}
+
+async function handleLeave() {
+    if (!confirm('Leave the voice channel? This will stop playback.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/control/leave`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('success', 'Left voice channel', 'queueMessage');
+            fetchStatus();
+            fetchQueue();
+        } else {
+            showMessage('error', `Error: ${data.error}`, 'queueMessage');
+        }
+    } catch (error) {
+        console.error('Leave request failed:', error);
+        showMessage('error', 'Failed to leave channel', 'queueMessage');
+    }
+}
+
+    } catch (error) {
+        console.error('Resume request failed:', error);
+        showMessage('error', 'Failed to resume', 'queueMessage');
+    }
+}
+
+async function handleStop() {
+    try {
+        const response = await fetch(`${API_URL}/control/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('success', 'Stopped playback', 'queueMessage');
+            fetchStatus();
+            fetchQueue();
+        } else {
+            showMessage('error', `Error: ${data.error}`, 'queueMessage');
+        }
+    } catch (error) {
+        console.error('Stop request failed:', error);
+        showMessage('error', 'Failed to stop', 'queueMessage');
     }
 }
 
@@ -480,6 +634,34 @@ async function handleClearQueue() {
         console.error('Clear queue failed:', error);
         showMessage('error', 'Failed to clear queue', 'queueMessage');
     }
+}
+
+// Progress tracking
+function updateProgress() {
+    if (!isPlaying || isPaused || trackDuration === 0) {
+        return;
+    }
+    
+    const currentTimeSeconds = Math.floor((Date.now() / 1000) - trackStartTime);
+    const progressPercent = Math.min((currentTimeSeconds / trackDuration) * 100, 100);
+    
+    if (elements.currentTime) {
+        elements.currentTime.textContent = formatTime(currentTimeSeconds);
+    }
+    
+    if (elements.totalTime) {
+        elements.totalTime.textContent = formatTime(trackDuration);
+    }
+    
+    if (elements.progressFill) {
+        elements.progressFill.style.width = `${progressPercent}%`;
+    }
+}
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 // Utility Functions

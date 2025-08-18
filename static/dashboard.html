@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Psychosonus Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
@@ -35,10 +36,34 @@
             </div>
 
             <div class="queue-controls">
-                <button id="playButton" class="control-btn play-btn">▶️ Play</button>
-                <button id="pauseButton" class="control-btn pause-btn">⏸️ Pause</button>
-                <button id="skipButton" class="control-btn skip-btn">⏭️ Skip</button>
-                <button id="clearQueueButton" class="control-btn clear-btn">🗑️ Clear</button>
+                <button id="playButton" class="control-btn" title="Play">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="pauseButton" class="control-btn" title="Pause">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="skipButton" class="control-btn" title="Skip">
+                    <i class="fas fa-step-forward"></i>
+                </button>
+                <button id="shuffleButton" class="control-btn" title="Shuffle Queue">
+                    <i class="fas fa-random"></i>
+                </button>
+                <button id="clearQueueButton" class="control-btn" title="Clear Queue">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <button id="leaveButton" class="control-btn" title="Leave Channel">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-info">
+                    <span id="currentTime">0:00</span>
+                    <span id="totalTime">0:00</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
             </div>
 
             <div class="queue-section">
@@ -66,7 +91,9 @@
                 <h2>Search</h2>
                 <div class="search-input-container">
                     <input type="text" id="searchQuery" placeholder="Search for a song or artist..." class="search-input">
-                    <button id="searchButton" class="search-btn">🔍</button>
+                    <button id="searchButton" class="search-btn">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
                 <div id="searchMessage" class="message"></div>
             </div>
