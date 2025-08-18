@@ -122,6 +122,173 @@ class MusicQueue:
         with self._lock:
             return len(self.queue)
 
+# Add this to the Song class in bot.py
+
+class Song:
+    """Song data structure"""
+    
+    def __init__(self, id: str, title: str, artist: str, duration: str, url: str, 
+                 source: str = 'youtube', youtube_url: Optional[str] = None):
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.duration = duration
+        self.url = url  # Original URL (Spotify or YouTube)
+        self.source = source  # 'spotify' or 'youtube'
+        self.youtube_url = youtube_url  # YouTube URL for playback if source is Spotify
+    
+    def to_dict(self) -> Dict[str, str]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'title': self.title,
+            'artist': self.artist,
+            'duration': self.duration,
+            'url': self.url,
+            'source': self.source,
+            'youtube_url': self.youtube_url
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, str]) -> 'Song':
+        """Create Song from dictionary"""
+        return cls(
+            id=data['id'],
+            title=data['title'],
+            artist=data['artist'],
+            duration=data['duration'],
+            url=data['url'],
+            source=data.get('source', 'youtube'),
+            youtube_url=data.get('youtube_url')
+        )
+    
+    def get_playback_url(self) -> str:
+        """Get the URL to use for playback"""
+        if self.source == 'spotify' and self.youtube_url:
+            return self.youtube_url
+        return self.url
+
+# Update the play_next method in MusicBot class
+
+async def play_next(self):
+    """Play next song in queue"""
+    if not self.voice_client:
+        self.is_playing = False
+        return
+    
+    next_song = self.music_queue.get_next()
+    if not next_song:
+        self.is_playing = False
+        if self.current_channel:
+            await self.current_channel.send("📭 Queue is empty")
+        return
+    
+    self.is_playing = True
+    
+    try:
+        # Determine which URL to use for audio extraction
+        playback_url = next_song.get_playback_url()
+        
+        # If it's a Spotify track without YouTube URL, search for it
+        if next_song.source == 'spotify' and not next_song.youtube_url:
+            if self.current_channel:
+                await self.current_channel.send(f"🔍 Finding YouTube source for: **{next_song.title}**")
+            
+            youtube_url = YouTubeManager.search_youtube_for_spotify_track(next_song)
+            if youtube_url:
+                next_song.youtube_url = youtube_url
+                playback_url = youtube_url
+                logger.info(f"Found YouTube URL for Spotify track: {next_song.title}")
+            else:
+                logger.error(f"Could not find YouTube equivalent for: {next_song.title}")
+                if self.current_channel:
+                    await self.current_channel.send(f"❌ Could not find playable source for: **{next_song.title}**")
+                await self.play_next()
+                return
+        
+        # Extract audio URL
+        audio_url = YouTubeManager.get_audio_url(playback_url)
+        if not audio_url:
+            logger.error(f"Failed to get audio URL for: {next_song.title}")
+            if self.current_channel:
+                await self.current_channel.send(f"❌ Failed to play: **{next_song.title}**")
+            await self.play_next()
+            return
+        
+        FFMPEG_OPTIONS = {
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            'options': '-vn -filter:a "volume=0.5"'
+        }
+        
+        source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
+        
+        def after_playing(error):
+            if error:
+                logger.error(f'Player error: {error}')
+            
+            # Schedule next track
+            future = asyncio.run_coroutine_threadsafe(self.play_next(), self.loop)
+            try:
+                future.result(timeout=5)
+            except Exception as e:
+                logger.error(f"Error scheduling next track: {e}")
+        
+        self.voice_client.play(source, after=after_playing)
+        logger.info(f"🎵 Now playing: {next_song.title}")
+        
+        if self.current_channel:
+            embed = discord.Embed(
+                title="🎵 Now Playing",
+                description=f"**{next_song.title}**\n{next_song.artist} • {next_song.duration}",
+                color=0x00ff00
+            )
+            if next_song.source == 'spotify':
+                embed.add_field(name="Source", value="🎵 Spotify → YouTube", inline=True)
+            await self.current_channel.send(embed=embed)
+        
+    except Exception as e:
+        logger.error(f"Error playing track: {e}")
+        if self.current_channel:
+            await self.current_channel.send(f"❌ Error playing: **{next_song.title}**")
+        await self.play_next()
+
+# Update the search endpoint in WebInterface class
+
+@self.app.route('/api/search', methods=['POST'])
+def search_music():
+    """Search for music"""
+    try:
+        data = request.json
+        query = data.get('query', '').strip()
+        
+        if not query:
+            return jsonify({'success': False, 'error': 'No query provided'})
+        
+        # First try Spotify search for better metadata
+        tracks = []
+        if hasattr(self.bot, 'search_manager') and self.bot.search_manager.is_service_available('spotify'):
+            spotify_tracks = self.bot.search_manager.search_tracks(query, limit=5)
+            for track in spotify_tracks:
+                # Mark as Spotify source
+                track.source = 'spotify'
+                tracks.append(track)
+        
+        # If no Spotify results or Spotify not available, fall back to YouTube
+        if not tracks:
+            youtube_tracks = YouTubeManager.search_tracks(query, limit=8)
+            for track in youtube_tracks:
+                track.source = 'youtube'
+                tracks.append(track)
+        
+        return jsonify({
+            'success': True,
+            'results': [track.to_dict() for track in tracks]
+        })
+        
+    except Exception as e:
+        logger.error(f"Search error: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 class MusicBot(commands.Bot):
     """Main Discord bot class"""
     

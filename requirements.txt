@@ -13,5 +13,5 @@ PyNaCl>=1.5.0
 # Spotify Integration
 spotipy>=2.22.1
 
-# YouTube Integration
+# YouTube Integration - REQUIRED for audio streaming
 yt-dlp>=2023.7.6
