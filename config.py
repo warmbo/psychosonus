@@ -40,3 +40,23 @@ class Config:
     def get(self, key: str, default=None):
         """Get configuration value"""
         return self.data.get(key, default)
+    
+    def get_base_url(self) -> str:
+        """Get the base URL for the web interface"""
+        domain = self.get('domain', 'localhost')
+        use_https = self.get('use_https', False)
+        web_port = self.get('web_port', 8888)
+        
+        # Determine protocol
+        protocol = 'https' if use_https else 'http'
+        
+        # Handle port - don't include if it's standard (80 for http, 443 for https)
+        if (use_https and web_port == 443) or (not use_https and web_port == 80):
+            return f"{protocol}://{domain}"
+        else:
+            return f"{protocol}://{domain}:{web_port}"
+    
+    def get_spotify_redirect_uri(self) -> str:
+        """Get the Spotify redirect URI based on configured domain"""
+        base_url = self.get_base_url()
+        return f"{base_url}/callback/spotify"

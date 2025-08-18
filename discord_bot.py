@@ -58,8 +58,8 @@ class MusicBot(commands.Bot):
                     self.voice_client = await channel.connect()
                 
                 self.current_channel = ctx.channel
-                web_port = self.config.get('web_port', 8888)
-                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: http://localhost:{web_port}")
+                dashboard_url = self.config.get_base_url()
+                await ctx.send(f"🎵 Joined **{channel.name}**\n🌐 Dashboard: {dashboard_url}")
                 
                 if not self.is_playing:
                     await self.play_next()
@@ -79,6 +79,18 @@ class MusicBot(commands.Bot):
                 await ctx.send("👋 Left voice channel")
             else:
                 await ctx.send("❌ Not in a voice channel")
+        
+        @self.command(name='dashboard', aliases=['web', 'url'])
+        async def show_dashboard(ctx):
+            """Show web dashboard URL"""
+            dashboard_url = self.config.get_base_url()
+            embed = discord.Embed(
+                title="🌐 Web Dashboard",
+                description=f"Access the web interface at:\n**{dashboard_url}**",
+                color=0x00ff00
+            )
+            embed.add_field(name="Features", value="• Remote control\n• Search & queue management\n• Real-time status", inline=False)
+            await ctx.send(embed=embed)
         
         @self.command(name='queue', aliases=['q'])
         async def show_queue(ctx):
@@ -155,8 +167,8 @@ class MusicBot(commands.Bot):
     async def on_ready(self):
         """Bot ready event"""
         logger.info(f'🎵 {self.user} is online!')
-        web_port = self.config.get('web_port', 8888)
-        logger.info(f'🌐 Web dashboard: http://localhost:{web_port}')
+        dashboard_url = self.config.get_base_url()
+        logger.info(f'🌐 Web dashboard: {dashboard_url}')
     
     async def on_command_error(self, ctx, error):
         """Handle command errors"""

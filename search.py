@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 class SpotifyManager:
     """Spotify API integration for music search"""
     
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(self, client_id: str, client_secret: str, config=None):
         self.client_id = client_id
         self.client_secret = client_secret
+        self.config = config
         self.access_token = None
         self.token_expires_at = 0
         
@@ -64,6 +65,13 @@ class SpotifyManager:
         if not self.access_token or time.time() >= self.token_expires_at:
             return self._get_access_token()
         return True
+    
+    def get_redirect_uri(self) -> str:
+        """Get the Spotify redirect URI from config or fallback"""
+        if self.config and hasattr(self.config, 'get_spotify_redirect_uri'):
+            return self.config.get_spotify_redirect_uri()
+        # Fallback to localhost if no config provided
+        return "http://localhost:8888/callback/spotify"
     
     def search_tracks(self, query: str, limit: int = 5) -> List[Song]:
         """Search for tracks on Spotify"""
@@ -180,19 +188,23 @@ class SpotifyManager:
 class SearchManager:
     """Main search manager that handles different music services"""
     
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
+    def __init__(self, config_data: Dict[str, Any], config_obj=None):
+        self.config_data = config_data
+        self.config_obj = config_obj
         self.spotify = None
         self.youtube = YouTubeManager()
         
-        spotify_client_id = config.get('spotify_client_id')
-        spotify_client_secret = config.get('spotify_client_secret')
+        spotify_client_id = config_data.get('spotify_client_id')
+        spotify_client_secret = config_data.get('spotify_client_secret')
         
         if spotify_client_id and spotify_client_secret:
             if (spotify_client_id != "SPOTIFY_CLIENT_ID_GOES_HERE" and 
                 spotify_client_secret != "SPOTIFY_CLIENT_SECRET_GOES_HERE"):
-                self.spotify = SpotifyManager(spotify_client_id, spotify_client_secret)
+                self.spotify = SpotifyManager(spotify_client_id, spotify_client_secret, config_obj)
                 logger.info("Spotify integration initialized")
+                if config_obj:
+                    redirect_uri = config_obj.get_spotify_redirect_uri()
+                    logger.info(f"Using Spotify redirect URI: {redirect_uri}")
             else:
                 logger.warning("Spotify credentials not configured")
         else:

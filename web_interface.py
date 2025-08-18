@@ -31,7 +31,7 @@ class WebInterface:
         
         # Initialize search manager if Spotify is available
         if SPOTIFY_AVAILABLE:
-            self.search_manager = SearchManager(config.data)
+            self.search_manager = SearchManager(config.data, config)
         else:
             self.search_manager = None
         
@@ -49,6 +49,32 @@ class WebInterface:
         def static_files(filename):
             """Serve static files"""
             return send_from_directory('static', filename)
+        
+        @self.app.route('/callback/spotify')
+        def spotify_callback():
+            """Handle Spotify OAuth callback"""
+            # This is a placeholder for Spotify OAuth implementation
+            # In a full implementation, this would handle the OAuth flow
+            return jsonify({
+                'message': 'Spotify callback received',
+                'redirect_uri': self.config.get_spotify_redirect_uri(),
+                'note': 'OAuth implementation would go here'
+            })
+        
+        @self.app.route('/api/config')
+        def get_config():
+            """Get public configuration information"""
+            return jsonify({
+                'success': True,
+                'domain': self.config.get('domain', 'localhost'),
+                'base_url': self.config.get_base_url(),
+                'use_https': self.config.get('use_https', False),
+                'spotify_configured': (
+                    self.search_manager and 
+                    self.search_manager.is_service_available('spotify')
+                ),
+                'spotify_redirect_uri': self.config.get_spotify_redirect_uri()
+            })
         
         @self.app.route('/api/search', methods=['POST'])
         def search_music():
@@ -309,7 +335,8 @@ class WebInterface:
                     'bot_is_playing': self.bot.is_playing,
                     'queue_size': self.bot.music_queue.size(),
                     'current_track': self.bot.music_queue.current_track.to_dict() if self.bot.music_queue.current_track else None,
-                    'voice_channel': self.bot.voice_client.channel.name if self.bot.voice_client else None
+                    'voice_channel': self.bot.voice_client.channel.name if self.bot.voice_client else None,
+                    'base_url': self.config.get_base_url()
                 })
             except Exception as e:
                 logger.error(f"Status error: {e}")
@@ -318,5 +345,13 @@ class WebInterface:
     def run(self):
         """Run Flask app"""
         port = self.config.get('web_port', 8888)
-        logger.info(f"Starting web interface on port {port}")
-        self.app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+        host = '0.0.0.0'
+        
+        logger.info(f"Starting web interface on {host}:{port}")
+        logger.info(f"Dashboard accessible at: {self.config.get_base_url()}")
+        
+        # Log Spotify configuration if available
+        if self.search_manager and self.search_manager.is_service_available('spotify'):
+            logger.info(f"Spotify redirect URI: {self.config.get_spotify_redirect_uri()}")
+        
+        self.app.run(host=host, port=port, debug=False, threaded=True)
