@@ -1,20 +1,13 @@
 {
-  "_comment": "Sonus Bot Configuration - Edit the values below",
-  "_instructions": {
-    "discord_token": "Get from https://discord.com/developers/applications - Create app > Bot > Copy Token",
-    "spotify_setup": "Go to https://developer.spotify.com/dashboard - Create app > Settings > Copy Client ID & Secret",
-    "spotify_redirect": "In Spotify app settings, add redirect URI: http://localhost:8888/callback/spotify",
-    "web_url": "Set this to your domain/subdomain where the bot is hosted (e.g., https://psychosonus.yourdomain.com)"
-  },
-  
-  "discord_token": "DISCORD_BOT_TOKEN_GOES_HERE",
-  
+  "discord_token": "YOUR_DISCORD_BOT_TOKEN",
+  "discord_client_id": "YOUR_DISCORD_CLIENT_ID",
+  "discord_client_secret": "YOUR_DISCORD_CLIENT_SECRET",
   "spotify_client_id": "SPOTIFY_CLIENT_ID_GOES_HERE",
   "spotify_client_secret": "SPOTIFY_CLIENT_SECRET_GOES_HERE",
-  
   "web_port": 8888,
-  "web_url": "http://localhost:8888",s
-  "command_prefix": "!p ",
+  "command_prefix": "ps-",
   "max_queue_size": 100,
-  "default_volume": 0.5
+  "default_volume": 0.5,
+  "session_secret": "some_random_secret_key_here",
+  "github_repo": "https://github.com/warmbo/psychosonus"
 }
