@@ -23,7 +23,7 @@ class MusicBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.guilds = True
-        intents.guild_members = True
+        intents.members = True
         
         super().__init__(
             command_prefix=config.get('command_prefix', '!'),
