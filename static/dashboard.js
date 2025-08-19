@@ -254,21 +254,21 @@ function updateStatusDisplay(data) {
         elements.connectedStatus.textContent = data.connected ? 'Yes' : 'No';
         elements.connectedStatus.style.color = data.connected ? '#00ff88' : '#ff4444';
     }
-    
+
     if (elements.voicePlayingStatus) {
         const statusText = data.paused ? 'Paused' : (data.playing ? 'Yes' : 'No');
         elements.voicePlayingStatus.textContent = statusText;
         elements.voicePlayingStatus.style.color = data.playing ? '#00ff88' : (data.paused ? '#ffaa00' : '#ff4444');
     }
-    
+
     if (elements.queueSize) {
         elements.queueSize.textContent = data.queue_size || '0';
     }
-    
+
     // Update global state
     isPlaying = data.playing;
     isPaused = data.paused;
-    
+
     // Update track info and progress
     if (data.current_track) {
         if (elements.currentTrack) {
@@ -280,14 +280,14 @@ function updateStatusDisplay(data) {
                 </div>
             `;
         }
-        
+
         // Parse duration and set track info
         const duration = data.current_track.duration;
         if (duration && duration.includes(':')) {
             const [mins, secs] = duration.split(':').map(Number);
             trackDuration = (mins * 60) + secs;
         }
-        
+
         // Reset start time if track changed
         if (data.track_changed || trackStartTime === 0) {
             trackStartTime = Date.now() / 1000;
@@ -299,13 +299,47 @@ function updateStatusDisplay(data) {
         trackDuration = 0;
         trackStartTime = 0;
     }
-    
+
     if (elements.voiceChannel) {
         const channelText = data.voice_channel ? `(${data.voice_channel})` : '';
         const guildText = data.guild_name ? ` - ${data.guild_name}` : '';
         elements.voiceChannel.textContent = channelText + guildText;
     }
-    
+
+    // --- Server selection UI ---
+    if (data.available_guilds && data.available_guilds.length > 0) {
+        let guildSelect = document.getElementById('guildSelect');
+        if (!guildSelect) {
+            guildSelect = document.createElement('select');
+            guildSelect.id = 'guildSelect';
+            guildSelect.style.margin = '10px';
+            // Insert at top of dashboard or wherever appropriate
+            document.body.insertBefore(guildSelect, document.body.firstChild);
+        }
+        guildSelect.innerHTML = data.available_guilds.map(g => 
+            `<option value="${g.id}">${g.name}</option>`
+        ).join('');
+        guildSelect.value = data.available_guilds.find(g => g.name === data.guild_name)?.id || data.available_guilds[0].id;
+        guildSelect.onchange = (e) => {
+            fetch('/api/select_guild', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guild_id: e.target.value })
+            })
+            .then(res => res.json())
+            .then(resp => {
+                if (resp.success) {
+                    showMessage('success', 'Server changed!', 'queueMessage');
+                    // Optionally, refresh status/queue
+                    fetchStatus();
+                    fetchQueue();
+                } else {
+                    showMessage('error', resp.error || 'Failed to change server', 'queueMessage');
+                }
+            });
+        };
+    }
+
     // Update control button states
     updateControlButtons(data);
 }

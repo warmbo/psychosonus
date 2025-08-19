@@ -165,78 +165,43 @@ class WebInterface:
             """Handle Discord OAuth2 callback"""
             code = request.args.get('code')
             error = request.args.get('error')
-            
             if error:
                 return f"Authorization error: {error}", 400
-            
             if not code:
                 return "Missing authorization code", 400
-            
             # Exchange code for token
             token_data = self.discord_auth.exchange_code(code)
             if not token_data:
                 logger.error("Failed to exchange authorization code. Redirecting to error page.")
                 return redirect(url_for('auth_page', error='token_exchange_failed'))
-            
             access_token = token_data['access_token']
-            
             # Get user info
             user_info = self.discord_auth.get_user_info(access_token)
             if not user_info:
                 return "Failed to get user information", 400
-            
             # Get user guilds
             user_guilds = self.discord_auth.get_user_guilds(access_token)
-            
-            # Filter to only guilds where bot is present
-            accessible_guilds = self.server_permissions.get_user_accessible_guilds(user_guilds)
-            
+            accessible_guilds = []
+            for guild in user_guilds:
+                guild_id = guild['id']
+                bot_guild = self.bot.get_guild(int(guild_id))
+                if bot_guild:
+                    accessible_guilds.append({
+                        'id': guild_id,
+                        'name': guild.get('name', 'Unknown Server'),
+                        'icon': guild.get('icon'),
+                        'bot_connected': (self.bot.voice_client and \
+                                         self.bot.voice_client.guild and \
+                                         self.bot.voice_client.guild.id == int(guild_id))
+                    })
             if not accessible_guilds:
+                logger.warning(f"No shared servers found for user {user_info['username']}")
                 return render_template_string("""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Access Denied - Psychosonus</title>
-                    <style>
-                        body { 
-                            font-family: 'Consolas', monospace; 
-                            background: #000; 
-                            color: #fff; 
-                            text-align: center; 
-                            padding: 50px;
-                        }
-                        .error-container {
-                            max-width: 500px;
-                            margin: 0 auto;
-                            padding: 40px;
-                            background: #111;
-                            border: 2px solid #f44;
-                            border-radius: 10px;
-                        }
-                        .title { color: #f44; font-size: 2rem; margin-bottom: 20px; }
-                        .message { color: #ccc; margin-bottom: 20px; }
-                        .retry-btn {
-                            background: #333;
-                            color: white;
-                            padding: 10px 20px;
-                            border: none;
-                            border-radius: 5px;
-                            text-decoration: none;
-                            display: inline-block;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="error-container">
-                        <h1 class="title">❌ Access Denied</h1>
-                        <p class="message">You are not a member of any servers where Psychosonus is installed.</p>
-                        <p class="message">Ask a server admin to invite the bot first!</p>
-                        <a href="/auth" class="retry-btn">Try Again</a>
-                    </div>
-                </body>
-                </html>
-                """)
-            
+                    <h1>No Access</h1>
+                    <p>Please join a server where the bot is added.</p>
+                    <p>Current bot servers: {{ bot_guilds }}</p>
+                    <a href="/auth">Try again</a>
+                """, bot_guilds=[g.name for g in self.bot.guilds])
             # Create session
             session['user'] = {
                 'user_id': user_info['id'],
@@ -245,9 +210,7 @@ class WebInterface:
                 'avatar': user_info.get('avatar'),
                 'guilds': accessible_guilds
             }
-            
             logger.info(f"User {user_info['username']} authenticated with access to {len(accessible_guilds)} guilds")
-            
             return redirect('/')
         
         @self.app.route('/auth/logout')
@@ -539,13 +502,11 @@ class WebInterface:
                 voice_playing = self.bot.voice_client.is_playing() if self.bot.voice_client else False
                 voice_paused = self.bot.voice_client.is_paused() if self.bot.voice_client else False
                 current_guild_id = self.bot.get_current_guild_id()
-                
                 # Check if user has access to current guild
                 user_has_access = False
                 if current_guild_id:
                     user_id = session['user']['user_id']
                     user_has_access = self.server_permissions.user_has_access(user_id, str(current_guild_id))
-                
                 return jsonify({
                     'success': True,
                     'connected': voice_connected,
@@ -556,10 +517,35 @@ class WebInterface:
                     'current_track': self.bot.music_queue.current_track.to_dict() if self.bot.music_queue.current_track else None,
                     'voice_channel': self.bot.voice_client.channel.name if self.bot.voice_client else None,
                     'guild_name': self.bot.voice_client.guild.name if self.bot.voice_client else None,
-                    'user_has_access': user_has_access
+                    'user_has_access': user_has_access,
+                    'available_guilds': [
+                        {'id': str(g.id), 'name': g.name}
+                        for g in self.bot.guilds
+                    ],
+                    'user_guilds': session.get('user', {}).get('guilds', [])
                 })
             except Exception as e:
                 logger.error(f"Status error: {e}")
+                return jsonify({'success': False, 'error': str(e)})
+
+        @self.app.route('/api/select_guild', methods=['POST'])
+        @self.require_auth
+        def select_guild():
+            """Set the current guild for the session (dashboard server selection)"""
+            try:
+                data = request.json
+                guild_id = data.get('guild_id')
+                if not guild_id:
+                    return jsonify({'success': False, 'error': 'No guild_id provided'}), 400
+                # Optionally, validate that the user has access to this guild
+                user_id = session['user']['user_id']
+                if not self.server_permissions.user_has_access(user_id, str(guild_id)):
+                    return jsonify({'success': False, 'error': 'You do not have access to this server'}), 403
+                # Set the current guild for the bot (if your bot supports switching context)
+                self.bot.set_current_guild_id(int(guild_id))
+                return jsonify({'success': True, 'message': 'Guild selected'})
+            except Exception as e:
+                logger.error(f"Select guild error: {e}")
                 return jsonify({'success': False, 'error': str(e)})
     
     def run(self):

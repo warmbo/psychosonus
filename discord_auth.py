@@ -178,14 +178,20 @@ class ServerPermissions:
     
     def user_has_access(self, user_id: str, guild_id: str) -> bool:
         """Check if user has access to guild's queue"""
-        # Check if bot is in the guild
-        guild = self.bot.get_guild(int(guild_id))
-        if not guild:
+        try:
+            guild = self.bot.get_guild(int(guild_id))
+            if not guild:
+                logger.warning(f"Guild {guild_id} not found")
+                return False
+            member = guild.get_member(int(user_id))
+            if not member:
+                logger.warning(f"User {user_id} not found in guild {guild_id}")
+                return False
+            # Additional permission checks can be added here
+            return True
+        except Exception as e:
+            logger.error(f"Access check error: {e}")
             return False
-        
-        # Check if user is in the guild
-        member = guild.get_member(int(user_id))
-        return member is not None
     
     def get_user_accessible_guilds(self, user_guilds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Get guilds where user has access and bot is present"""
