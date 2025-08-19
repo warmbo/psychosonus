@@ -38,9 +38,9 @@ class WebInterface:
         # Force HTTPS redirect URI using public domain
         public_domain = config.get("domain", "localhost")
         self.discord_auth = DiscordAuth(
-            client_id=config.get("discord_client_id"),
-            client_secret=config.get("discord_client_secret"),
-            redirect_uri=f"https://{public_domain}/auth/callback"
+            client_id=config.get('discord_client_id'),
+            client_secret=config.get('discord_client_secret'),
+            redirect_uri=f"https://{config.get('domain', 'localhost')}/auth/callback"
         )
         
         # Initialize server permissions
