@@ -40,7 +40,7 @@ class WebInterface:
         self.discord_auth = DiscordAuth(
             client_id=config.get('discord_client_id'),
             client_secret=config.get('discord_client_secret'),
-            redirect_uri=f"https://{config.get('domain', 'localhost')}/auth/callback"
+            redirect_uri=config.get_base_url() + "/auth/callback"  # Use config's base URL
         )
         
         # Initialize server permissions
@@ -176,7 +176,8 @@ class WebInterface:
             # Exchange code for token
             token_data = self.discord_auth.exchange_code(code)
             if not token_data:
-                return "Failed to exchange authorization code", 400
+                logger.error("Failed to exchange authorization code. Redirecting to error page.")
+                return redirect(url_for('auth_page', error='token_exchange_failed'))
             
             access_token = token_data['access_token']
             

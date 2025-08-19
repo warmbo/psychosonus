@@ -23,12 +23,15 @@ class DiscordAuth:
         self.oauth_url = "https://discord.com/api/oauth2/token"
         
     def get_authorization_url(self, state: str = None, include_bot: bool = True) -> str:
-        """Generate Discord OAuth2 authorization URL"""
+        if state is None:
+            state = secrets.token_urlsafe(16)
+        
         params = {
             'client_id': self.client_id,
             'redirect_uri': self.redirect_uri,
             'response_type': 'code',
             'scope': 'identify guilds',
+            'state': state  # Always include state for CSRF protection
         }
 
         if include_bot:
