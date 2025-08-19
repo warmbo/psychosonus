@@ -15,14 +15,7 @@ logger = logging.getLogger(__name__)
 class DiscordAuth:
     """Discord OAuth2 authentication handler"""
     
-    def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_uri = redirect_uri
-        self.api_endpoint = "https://discord.com/api/v10"
-        self.oauth_url = "https://discord.com/api/oauth2/token"
-        
-    def get_authorization_url(self, state: str = None) -> str:
+    def get_authorization_url(self, state: str = None, include_bot: bool = True) -> str:
         """Generate Discord OAuth2 authorization URL"""
         params = {
             'client_id': self.client_id,
@@ -30,9 +23,16 @@ class DiscordAuth:
             'response_type': 'code',
             'scope': 'identify guilds',
         }
+
+        if include_bot:
+            # Add bot + slash command scopes for invite flow
+            params['scope'] += ' bot applications.commands'
+            # Adjust permissions as needed (example: connect, speak, etc.)
+            params['permissions'] = '3145728'
+
         if state:
             params['state'] = state
-            
+
         return f"https://discord.com/api/oauth2/authorize?{urlencode(params)}"
     
     def exchange_code(self, code: str) -> Optional[Dict[str, Any]]:

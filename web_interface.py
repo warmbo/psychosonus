@@ -35,11 +35,12 @@ class WebInterface:
         # Set up session secret
         self.app.secret_key = config.get('session_secret', secrets.token_hex(32))
         
-        # Initialize Discord OAuth2
+        # Force HTTPS redirect URI using public domain
+        public_domain = config.get("domain", "localhost")
         self.discord_auth = DiscordAuth(
-            client_id=config.get('discord_client_id'),
-            client_secret=config.get('discord_client_secret'),
-            redirect_uri=f"{config.get('domain', 'http://localhost')}/auth/callback"
+            client_id=config.get("discord_client_id"),
+            client_secret=config.get("discord_client_secret"),
+            redirect_uri=f"https://{public_domain}/auth/callback"
         )
         
         # Initialize server permissions
@@ -566,5 +567,6 @@ class WebInterface:
         port = self.config.get('port', 8888)
         domain = self.config.get('domain', 'localhost')
         logger.info(f"Starting web interface on port {port}")
-        logger.info(f"Discord OAuth2 redirect URI: http://{domain}:{port}/auth/callback")
+        domain = self.config.get("domain", "localhost")
+        logger.info(f"Discord OAuth2 redirect URI: https://{domain}/auth/callback")
         self.app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
