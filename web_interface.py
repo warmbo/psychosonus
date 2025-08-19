@@ -568,5 +568,5 @@ class WebInterface:
         domain = self.config.get('domain', 'localhost')
         logger.info(f"Starting web interface on port {port}")
         domain = self.config.get("domain", "localhost")
-        logger.info(f"Discord OAuth2 redirect URI: https://{config.get('domain', 'localhost')}/auth/callback")
+        logger.info(f"Discord OAuth2 redirect URI: https://{self.config.get('domain', 'localhost')}/auth/callback")
         self.app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

@@ -42,6 +42,32 @@ class DiscordAuth:
 
         return f"https://discord.com/api/oauth2/authorize?{urlencode(params)}"
     
+    def refresh_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
+        """Refresh the access token using a refresh token"""
+        try:
+            data = {
+                'client_id': self.client_id,
+                'client_secret': self.client_secret,
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+            }
+
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+
+            response = requests.post(self.oauth_url, data=data, headers=headers)
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error refreshing token: {e}")
+            return None
+
     def exchange_code(self, code: str) -> Optional[Dict[str, Any]]:
         """Exchange authorization code for access token"""
         try:
@@ -52,19 +78,22 @@ class DiscordAuth:
                 'code': code,
                 'redirect_uri': self.redirect_uri,
             }
-            
+
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-            
+
             response = requests.post(self.oauth_url, data=data, headers=headers)
-            
+
             if response.status_code == 200:
-                return response.json()
+                token_data = response.json()
+                if 'refresh_token' not in token_data:
+                    logger.warning("No refresh token provided in the response.")
+                return token_data
             else:
                 logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error exchanging code: {e}")
             return None
