@@ -35,12 +35,11 @@ class WebInterface:
         # Set up session secret
         self.app.secret_key = config.get('session_secret', secrets.token_hex(32))
         
-        # Force HTTPS redirect URI using public domain
-        public_domain = config.get("domain", "localhost")
+        # Use config's redirect_uri without port
         self.discord_auth = DiscordAuth(
             client_id=config.get('discord_client_id'),
             client_secret=config.get('discord_client_secret'),
-            redirect_uri=config.get_base_url() + "/auth/callback"  # Use config's base URL
+            redirect_uri=config.get('redirect_uri')  # Port-less URI from config
         )
         
         # Initialize server permissions

@@ -82,19 +82,13 @@ class Config:
             return 'https'
     
     def get_base_url(self) -> str:
-        """Get the complete base URL"""
+        """Get the complete base URL without port for external use"""
         domain = self.get_domain()
-        port = self.get_port()
         protocol = self.get_protocol()
-        
-        # Standard ports don't need to be specified
-        if (protocol == 'https' and port == 443) or (protocol == 'http' and port == 80):
-            return f"{protocol}://{domain}"
-        else:
-            return f"{protocol}://{domain}:{port}"
-    
+        return f"{protocol}://{domain}"
+
     def get_discord_redirect_uri(self) -> str:
-        """Get the Discord OAuth2 redirect URI"""
+        """Get the Discord OAuth2 redirect URI without port"""
         return f"{self.get_base_url()}/auth/callback"
     
     def get_spotify_redirect_uri(self) -> str:
