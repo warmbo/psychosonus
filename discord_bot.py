@@ -139,12 +139,21 @@ class MusicBot(commands.Bot):
         
         @self.command(name='dashboard', aliases=['web', 'ui'])
         async def dashboard_info(ctx):
-            """Show dashboard information"""
+            """Show dashboard information with a unique URL for this user/channel context"""
             port = self.config.get('port', 8888)
-            
+            domain = self.config.get_domain()
+            # Generate a unique token or query string for this user/channel/guild
+            user_id = ctx.author.id
+            guild_id = ctx.guild.id if ctx.guild else None
+            channel_id = ctx.author.voice.channel.id if ctx.author.voice else None
+            if not channel_id:
+                await ctx.send("❌ You must be in a voice channel to get a dashboard link for your queue.")
+                return
+            # For simplicity, use a signed token or just pass IDs (for demo, use query string)
+            dashboard_url = f"https://{domain}:{port}/dashboard?guild={guild_id}&channel={channel_id}&user={user_id}"
             embed = discord.Embed(
                 title="🌐 Web Dashboard",
-                description=f"Access the web interface at: https://{domain}:{port}",
+                description=f"Access your queue dashboard here: [Open Dashboard]({dashboard_url})",
                 color=0x00ff88
             )
             embed.add_field(
@@ -157,20 +166,11 @@ class MusicBot(commands.Bot):
                 value="• Search music\n• Manage queue\n• Control playback\n• Real-time status",
                 inline=True
             )
-            
-            if self.current_guild_id == ctx.guild.id:
-                embed.add_field(
-                    name="Status",
-                    value="✅ Bot connected to this server",
-                    inline=True
-                )
-            else:
-                embed.add_field(
-                    name="Status", 
-                    value="❌ Use `!join` to connect bot first",
-                    inline=True
-                )
-            
+            embed.add_field(
+                name="Context",
+                value=f"Guild: `{guild_id}`\nChannel: `{channel_id}`\nUser: `{user_id}`",
+                inline=False
+            )
             await ctx.send(embed=embed)
         
         @self.command(name='queue', aliases=['q'])

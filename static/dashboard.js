@@ -306,39 +306,7 @@ function updateStatusDisplay(data) {
         elements.voiceChannel.textContent = channelText + guildText;
     }
 
-    // --- Server selection UI ---
-    if (data.available_guilds && data.available_guilds.length > 0) {
-        let guildSelect = document.getElementById('guildSelect');
-        if (!guildSelect) {
-            guildSelect = document.createElement('select');
-            guildSelect.id = 'guildSelect';
-            guildSelect.style.margin = '10px';
-            // Insert at top of dashboard or wherever appropriate
-            document.body.insertBefore(guildSelect, document.body.firstChild);
-        }
-        guildSelect.innerHTML = data.available_guilds.map(g => 
-            `<option value="${g.id}">${g.name}</option>`
-        ).join('');
-        guildSelect.value = data.available_guilds.find(g => g.name === data.guild_name)?.id || data.available_guilds[0].id;
-        guildSelect.onchange = (e) => {
-            fetch('/api/select_guild', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ guild_id: e.target.value })
-            })
-            .then(res => res.json())
-            .then(resp => {
-                if (resp.success) {
-                    showMessage('success', 'Server changed!', 'queueMessage');
-                    // Optionally, refresh status/queue
-                    fetchStatus();
-                    fetchQueue();
-                } else {
-                    showMessage('error', resp.error || 'Failed to change server', 'queueMessage');
-                }
-            });
-        };
-    }
+    // ...removed server selection UI...
 
     // Update control button states
     updateControlButtons(data);

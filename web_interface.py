@@ -25,6 +25,24 @@ except ImportError:
     SPOTIFY_AVAILABLE = False
 
 class WebInterface:
+    def setup_routes(self):
+        """Setup Flask routes"""
+
+        @self.app.route('/dashboard')
+        @self.require_auth
+        def dashboard_with_context():
+            """Serve dashboard and store context from query string (guild, channel, user)"""
+            guild_id = request.args.get('guild')
+            channel_id = request.args.get('channel')
+            user_id = request.args.get('user')
+            # Store in session for later API calls
+            if guild_id and channel_id and user_id:
+                session['dashboard_context'] = {
+                    'guild_id': guild_id,
+                    'channel_id': channel_id,
+                    'user_id': user_id
+                }
+            return send_from_directory('static', 'dashboard.html')
     """Flask web interface with Discord OAuth2"""
     
     def __init__(self, bot, config: Config):
@@ -496,17 +514,21 @@ class WebInterface:
         @self.app.route('/api/status')
         @self.require_auth
         def get_status():
-            """Get bot status"""
+            """Get bot status for the dashboard context"""
             try:
-                voice_connected = self.bot.voice_client is not None
-                voice_playing = self.bot.voice_client.is_playing() if self.bot.voice_client else False
-                voice_paused = self.bot.voice_client.is_paused() if self.bot.voice_client else False
-                current_guild_id = self.bot.get_current_guild_id()
-                # Check if user has access to current guild
-                user_has_access = False
-                if current_guild_id:
-                    user_id = session['user']['user_id']
-                    user_has_access = self.server_permissions.user_has_access(user_id, str(current_guild_id))
+                context = session.get('dashboard_context')
+                if not context:
+                    return jsonify({'success': False, 'error': 'No dashboard context set'}), 400
+                guild_id = context.get('guild_id')
+                channel_id = context.get('channel_id')
+                user_id = context.get('user_id')
+                # Only show status if bot is in the right guild/channel
+                bot_guild = self.bot.get_guild(int(guild_id)) if guild_id else None
+                voice_connected = self.bot.voice_client is not None and self.bot.voice_client.guild.id == int(guild_id) if self.bot.voice_client and guild_id else False
+                voice_playing = self.bot.voice_client.is_playing() if self.bot.voice_client and voice_connected else False
+                voice_paused = self.bot.voice_client.is_paused() if self.bot.voice_client and voice_connected else False
+                # Only allow access if user is in the right guild
+                user_has_access = self.server_permissions.user_has_access(user_id, guild_id) if guild_id and user_id else False
                 return jsonify({
                     'success': True,
                     'connected': voice_connected,
@@ -515,38 +537,14 @@ class WebInterface:
                     'bot_is_playing': self.bot.is_playing,
                     'queue_size': self.bot.music_queue.size(),
                     'current_track': self.bot.music_queue.current_track.to_dict() if self.bot.music_queue.current_track else None,
-                    'voice_channel': self.bot.voice_client.channel.name if self.bot.voice_client else None,
-                    'guild_name': self.bot.voice_client.guild.name if self.bot.voice_client else None,
-                    'user_has_access': user_has_access,
-                    'available_guilds': [
-                        {'id': str(g.id), 'name': g.name}
-                        for g in self.bot.guilds
-                    ],
-                    'user_guilds': session.get('user', {}).get('guilds', [])
+                    'voice_channel': self.bot.voice_client.channel.name if self.bot.voice_client and voice_connected else None,
+                    'guild_name': bot_guild.name if bot_guild else None,
+                    'user_has_access': user_has_access
                 })
             except Exception as e:
                 logger.error(f"Status error: {e}")
                 return jsonify({'success': False, 'error': str(e)})
 
-        @self.app.route('/api/select_guild', methods=['POST'])
-        @self.require_auth
-        def select_guild():
-            """Set the current guild for the session (dashboard server selection)"""
-            try:
-                data = request.json
-                guild_id = data.get('guild_id')
-                if not guild_id:
-                    return jsonify({'success': False, 'error': 'No guild_id provided'}), 400
-                # Optionally, validate that the user has access to this guild
-                user_id = session['user']['user_id']
-                if not self.server_permissions.user_has_access(user_id, str(guild_id)):
-                    return jsonify({'success': False, 'error': 'You do not have access to this server'}), 403
-                # Set the current guild for the bot (if your bot supports switching context)
-                self.bot.set_current_guild_id(int(guild_id))
-                return jsonify({'success': True, 'message': 'Guild selected'})
-            except Exception as e:
-                logger.error(f"Select guild error: {e}")
-                return jsonify({'success': False, 'error': str(e)})
     
     def run(self):
         """Run Flask app"""
