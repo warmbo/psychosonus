@@ -15,6 +15,13 @@ logger = logging.getLogger(__name__)
 class DiscordAuth:
     """Discord OAuth2 authentication handler"""
     
+    def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.redirect_uri = redirect_uri
+        self.api_endpoint = "https://discord.com/api/v10"
+        self.oauth_url = "https://discord.com/api/oauth2/token"
+        
     def get_authorization_url(self, state: str = None, include_bot: bool = True) -> str:
         """Generate Discord OAuth2 authorization URL"""
         params = {
